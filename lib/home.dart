@@ -33,18 +33,38 @@ class HomeScreen extends StatelessWidget {
                                                                                MaterialPageRoute(builder: (context) => LoginPage())));
                         },
                         child: Icon(
-                          Icons.account_circle,
+                          Icons.logout_sharp,
                           size: 30.0,
+                          color: Colors.white
                         ),
                       )
                   )
                 ]
             ),
             body: Center(
-                child: Text("Home")
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      ElevatedButton(
+                          onPressed: () {
+
+                          },
+                          child: Text("My Campaigns")
+                      ),
+                      ElevatedButton(
+                          onPressed: () {
+
+                          },
+                          child: Text("Join Campaign")
+                      )
+                    ],
+                  )
+                )
             )
         )
     );
   }
 }
+
 
