@@ -2,14 +2,57 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'map.dart';
 
 // BEGIN transformationsDemo#1
 
+class ImageLoader extends StatefulWidget {
+  const ImageLoader({Key? key}) : super(key: key);
+  @override
+  _ImageLoaderState createState() => _ImageLoaderState();
+}
+
+
+class _ImageLoaderState extends State<ImageLoader> {
+  ui.Image? _image = null;
+
+  @override
+  initState(){
+    super.initState();
+    _fetchImage();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+   if(_image != null) //TODO: Maybe a source of bug. Research
+     return GamePage(_image!);
+   else
+     return CircularProgressIndicator();
+  }
+
+  void _fetchImage() async{
+    Completer<ImageInfo> completer = Completer();
+    var img = NetworkImage('https://flutter.github.io/assets-for-api-docs/assets/widgets/owl.jpg');
+    img.resolve(ImageConfiguration()).addListener(
+        ImageStreamListener((ImageInfo info, bool _) {
+          completer.complete(info);
+        }));
+    completer.future.then((value) {
+      setState(() {
+        _image = value.image;
+      });
+    });
+  }
+}
+
+// ignore: must_be_immutable
 class GamePage extends StatefulWidget {
-  const GamePage({Key? key}) : super(key: key);
+  GamePage(this._image, {Key? key}) : super(key: key);
+
+ late ui.Image _image;
 
   @override
   _GamePageState createState() => _GamePageState();
@@ -87,6 +130,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     if (currentScale != _scale) {
       setState(() {
         _scale = currentScale;
+        //print(_scale.toString() + "\n");
       });
     }
   }
@@ -165,6 +209,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   painter: _BoardPainter(
                     board: _board,
                     showDetail: _scale > 1.5,
+                    scale: _scale,
+                    img: widget._image
                   ),
                   // This child gives the CustomPaint an intrinsic size.
                   child: SizedBox(
@@ -208,10 +254,14 @@ class _BoardPainter extends CustomPainter {
   const _BoardPainter({
     required this.board,
     required this.showDetail,
+    required this.scale,
+    required this.img
   });
 
   final bool showDetail;
   final Board board;
+  final ui.Image img;
+  final double scale;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -260,9 +310,17 @@ class _BoardPainter extends CustomPainter {
           }
         }
       }
-      final ui.Vertices vertices =
-      board.getVerticesForBoardPoint(boardPoint, color);
+      List val = board.getVerticesForBoardPoint(boardPoint, color);
+      final ui.Vertices vertices = val[0];
+      List<Offset> positions = val[1];
       canvas.drawVertices(vertices, BlendMode.color, Paint());
+
+      Offset center = positions[0].translate(positions[0].dx / 2, -positions[0].dx / 2);
+      double width = 32.0;
+      paintImage(canvas: canvas, image: img, rect: Rect.fromCenter(center: center, width: width, height: width));
+
+
+      //print((positions[1].dx - positions[0].dx).toString() + " " + (positions[2].dy - positions[0].dy).toString() + "\n");
 
       /*
       final ui.ParagraphBuilder paragraphBuilder = ui.ParagraphBuilder(ui.ParagraphStyle(

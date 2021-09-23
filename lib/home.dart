@@ -49,7 +49,7 @@ class HomeScreen extends StatelessWidget {
                     children: <Widget>[
                       ElevatedButton(
                           onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => GamePage()));
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => ImageLoader()));
                           },
                           child: Text("My Campaigns")
                       ),

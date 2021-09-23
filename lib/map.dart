@@ -147,18 +147,18 @@ class Board extends Object with IterableMixin<BoardPoint?> {
   }
 
   // Get Vertices that can be drawn to a Canvas for the given BoardPoint.
-  Vertices getVerticesForBoardPoint(BoardPoint boardPoint, Color color) {
+List getVerticesForBoardPoint(BoardPoint boardPoint, Color color) {
     final Point<double> centerOfHexZeroCenter = boardPointToPoint(boardPoint);
 
     final List<Offset> positions = positionsForHexagonAtOrigin.map((offset) {
       return offset.translate(centerOfHexZeroCenter.x, centerOfHexZeroCenter.y);
     }).toList();
 
-    return Vertices(
+    return [Vertices(
       VertexMode.triangles,
       positions,
       colors: List<Color>.filled(positions.length, Colors.white),
-    );
+    ), positions];
   }
 
   // Return a new board with the given BoardPoint selected.
