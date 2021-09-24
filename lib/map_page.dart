@@ -1,12 +1,8 @@
-// Copyright 2014 The Flutter team. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'map.dart';
-
+//import 'map.dart';
+import 'board.dart';
 // BEGIN transformationsDemo#1
 
 class ImageLoader extends StatefulWidget {
@@ -27,22 +23,23 @@ class _ImageLoaderState extends State<ImageLoader> {
 
   @override
   Widget build(BuildContext context) {
-   if(_image != null) //TODO: Maybe a source of bug. Research
-     return GamePage(_image!);
-   else
-     return CircularProgressIndicator();
+    if(_image != null) //TODO: Maybe a source of bug. Research
+      return GamePage(_image!);
+    else
+      return CircularProgressIndicator();
   }
 
-  void _fetchImage() async{
-    Completer<ImageInfo> completer = Completer();
-    var img = NetworkImage('https://flutter.github.io/assets-for-api-docs/assets/widgets/owl.jpg');
-    img.resolve(ImageConfiguration()).addListener(
-        ImageStreamListener((ImageInfo info, bool _) {
-          completer.complete(info);
-        }));
+  void _fetchImage() async {
+    Image widgetsImage = Image.asset('assets/cave.png');
+    Completer<ui.Image> completer = Completer<ui.Image>();
+    widgetsImage.image
+        .resolve(ImageConfiguration(size: ui.Size(10, 10)))
+        .addListener(ImageStreamListener((ImageInfo info, bool _){
+      completer.complete(info.image);
+    }));
     completer.future.then((value) {
       setState(() {
-        _image = value.image;
+        _image = value;
       });
     });
   }
@@ -52,7 +49,7 @@ class _ImageLoaderState extends State<ImageLoader> {
 class GamePage extends StatefulWidget {
   GamePage(this._image, {Key? key}) : super(key: key);
 
- late ui.Image _image;
+  late ui.Image _image;
 
   @override
   _GamePageState createState() => _GamePageState();
@@ -60,17 +57,13 @@ class GamePage extends StatefulWidget {
 
 class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   // The radius of a hexagon tile in pixels.
-  static const _kHexagonRadius = 32.0;
+  static const _squareRadius = 32.0;
   // The margin between hexagons.
-  static const _kHexagonMargin = 0.0;
+  static const _squareMargin = 0.0;
   // The radius of the entire board in hexagons, not including the center.
-  static const _kBoardRadius = 12;
+  static const _boardRadius = 12;
 
-  Board _board = Board(
-    boardRadius: _kBoardRadius,
-    hexagonRadius: _kHexagonRadius,
-    hexagonMargin: _kHexagonMargin,
-  );
+  Board _board = Board(_boardRadius, _squareRadius, _squareMargin, null);
 
   double _scale = 1.0;
   bool _firstRender = true;
@@ -175,11 +168,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             // viewport initially.
             if (_firstRender) {
               _firstRender = false;
-              _homeTransformation = Matrix4.identity()..translate(
-                viewportSize.width / 2,
-                viewportSize.height / 2,
-              );
-              //_homeTransformation = Matrix4.identity();
+              _homeTransformation = Matrix4.identity();
               _transformationController.value = _homeTransformation!;
             }
 
@@ -199,7 +188,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                 boundaryMargin: EdgeInsets.fromLTRB(
                   _board.size.width * 2,
                   _board.size.height * .75,
-                  _board.size.width / 4,
+                  _board.size.width * 2,
                   _board.size.height * 4,
                 ),
                 minScale: 0.01,
@@ -207,10 +196,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                 child: CustomPaint(
                   size: _board.size,
                   painter: _BoardPainter(
-                    board: _board,
-                    showDetail: _scale > 1.5,
-                    scale: _scale,
-                    img: widget._image
+                      board: _board,
+                      showDetail: _scale > 1.5,
+                      scale: _scale,
+                      img: widget._image
                   ),
                   // This child gives the CustomPaint an intrinsic size.
                   child: SizedBox(
@@ -272,53 +261,25 @@ class _BoardPainter extends CustomPainter {
       );
       */
       final double opacity = board.selected == boardPoint ? 0.2 : showDetail ? 0.8 : 0.5;
-      Color color;
-      if (boardPoint!.q < 2) {
-        if (!showDetail) {
-          color = Colors.red.withOpacity(opacity);
-        } else {
-          if (boardPoint.r % 2 == 1) {
-            if (boardPoint.q % 2 == 1) {
-              color = Colors.deepOrangeAccent.withOpacity(opacity);
-            } else {
-              color = Colors.orangeAccent.withOpacity(opacity);
-            }
-          } else {
-            if (boardPoint.q % 2 == 1) {
-              color = Colors.pinkAccent.withOpacity(opacity);
-            } else {
-              color = Colors.pink.withOpacity(opacity);
-            }
-          }
-        }
-      } else {
-        if (!showDetail) {
-          color = Colors.blue.withOpacity(opacity);
-        } else {
-          if (boardPoint.r % 2 == 1) {
-            if (boardPoint.q % 2 == 1) {
-              color = Colors.blueAccent.withOpacity(opacity);
-            } else {
-              color = Colors.blueGrey.withOpacity(opacity);
-            }
-          } else {
-            if (boardPoint.q % 2 == 1) {
-              color = Colors.lightBlue.withOpacity(opacity);
-            } else {
-              color = Colors.lightBlueAccent.withOpacity(opacity);
-            }
-          }
-        }
+      Color color = Colors.white;
+      if(boardPoint != null) {
+        List val = board.getVerticesForBoardPoint(boardPoint, color);
+        final ui.Vertices vertices = val[0];
+        List<Offset> positions = val[1];
+        canvas.drawVertices(vertices, BlendMode.color, Paint());
+
+        Offset center = positions[0].translate(
+            positions[0].dx, -positions[0].dx / 2);
+        double width = 32.0;
+        paintImage(canvas: canvas,
+            image: img,
+            rect: Rect.fromPoints(positions[0], positions[5]));
+
+        canvas.drawLine(positions[0], positions[1], Paint());
+        canvas.drawLine(positions[0], positions[4], Paint());
+        canvas.drawLine(positions[4], positions[5], Paint());
+        canvas.drawLine(positions[5], positions[1], Paint());
       }
-      List val = board.getVerticesForBoardPoint(boardPoint, color);
-      final ui.Vertices vertices = val[0];
-      List<Offset> positions = val[1];
-      canvas.drawVertices(vertices, BlendMode.color, Paint());
-
-      Offset center = positions[0].translate(positions[0].dx / 2, -positions[0].dx / 2);
-      double width = 32.0;
-      paintImage(canvas: canvas, image: img, rect: Rect.fromCenter(center: center, width: width, height: width));
-
 
       //print((positions[1].dx - positions[0].dx).toString() + " " + (positions[2].dy - positions[0].dy).toString() + "\n");
 

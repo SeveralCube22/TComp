@@ -18,7 +18,7 @@ class Board extends Object with IterableMixin<BoardPoint?> {
     // Set up the positions for the center hexagon where the entire board is
     // centered on the origin.
     // Start point of hexagon (top vertex).
-    final Point<double> hexStart = Point<double>(-hexagonRadius, -hexagonRadius);
+    final Point<double> hexStart = Point<double>(0, 0);
     final double hexagonRadiusPadded = hexagonRadius - hexagonMargin;
     final double centerToFlat = sqrt(3) / 2 * hexagonRadiusPadded;
     positionsForHexagonAtOrigin.addAll(<Offset>[
