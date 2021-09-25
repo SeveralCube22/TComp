@@ -1,287 +1,320 @@
-import 'dart:collection' show IterableMixin;
-import 'dart:math';
-import 'dart:ui' show Vertices;
-import 'package:flutter/material.dart' hide Gradient;
-import 'package:vector_math/vector_math_64.dart' show Vector3;
+import 'dart:async';
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'board.dart';
+// BEGIN transformationsDemo#1
 
-@immutable
-class Board extends Object with IterableMixin<BoardPoint?> {
-  Board({
-    required this.boardRadius,
-    required this.hexagonRadius,
-    required this.hexagonMargin,
-    this.selected,
-    List<BoardPoint>? boardPoints,
-  })  : assert(boardRadius > 0),
-        assert(hexagonRadius > 0),
-        assert(hexagonMargin >= 0) {
-    // Set up the positions for the center hexagon where the entire board is
-    // centered on the origin.
-    // Start point of hexagon (top vertex).
-    final Point<double> hexStart = Point<double>(0, 0);
-    final double hexagonRadiusPadded = hexagonRadius - hexagonMargin;
-    final double centerToFlat = sqrt(3) / 2 * hexagonRadiusPadded;
-    positionsForHexagonAtOrigin.addAll(<Offset>[
-      Offset(hexStart.x, hexStart.y),
-      Offset(hexStart.x - hexagonRadiusPadded, hexStart.y),
-      Offset(hexStart.x - hexagonRadiusPadded, hexStart.y + hexagonRadiusPadded),
+class ImageLoader extends StatefulWidget {
+  const ImageLoader({Key? key}) : super(key: key);
+  @override
+  _ImageLoaderState createState() => _ImageLoaderState();
+}
 
-      Offset(hexStart.x, hexStart.y),
-      Offset(hexStart.x, hexStart.y + hexagonRadiusPadded),
-      Offset(hexStart.x - hexagonRadiusPadded, hexStart.y + hexagonRadiusPadded),
-    ]);
 
-    if (boardPoints != null) {
-      _boardPoints.addAll(boardPoints);
-    } else {
-      // Generate boardPoints for a fresh board.
-      BoardPoint? boardPoint = _getNextBoardPoint(null);
-      while (boardPoint != null) {
-        _boardPoints.add(boardPoint);
-        boardPoint = _getNextBoardPoint(boardPoint);
-      }
-    }
-  }
-
-  final int boardRadius; // Number of hexagons from center to edge.
-  final double hexagonRadius; // Pixel radius of a hexagon (center to vertex).
-  final double hexagonMargin; // Margin between hexagons.
-  final List<Offset> positionsForHexagonAtOrigin = <Offset>[];
-  final BoardPoint? selected;
-  final List<BoardPoint> _boardPoints = <BoardPoint>[];
+class _ImageLoaderState extends State<ImageLoader> {
+  ui.Image? _image = null;
 
   @override
-  Iterator<BoardPoint?> get iterator => _BoardIterator(_boardPoints);
-
-  // Get the size in pixels of the entire board.
-  Size get size {
-    final double centerToFlat = sqrt(3) / 2 * hexagonRadius;
-    return Size(
-      (boardRadius * 2 + 1) * centerToFlat * 2,
-      2 * (hexagonRadius + boardRadius * 1.5 * hexagonRadius),
-    );
+  initState(){
+    super.initState();
+    _fetchImage();
   }
 
-  // For a given q axial coordinate, get the range of possible r values
-  // See the definition of BoardPoint for more information about hex grids and
-  // axial coordinates.
-  _Range _getRRangeForQ(int q) {
-    int rStart;
-    int rEnd;
-    if (q <= 0) {
-      rStart = -boardRadius - q;
-      rEnd = boardRadius;
-    } else {
-      rEnd = boardRadius - q;
-      rStart = -boardRadius;
-    }
-
-    return _Range(rStart, rEnd);
+  @override
+  Widget build(BuildContext context) {
+    if(_image != null) //TODO: Maybe a source of bug. Research
+      return GamePage(_image!);
+    else
+      return CircularProgressIndicator();
   }
 
-  // Get the BoardPoint that comes after the given BoardPoint. If given null,
-  // returns the origin BoardPoint. If given BoardPoint is the last, returns
-  // null.
-  BoardPoint? _getNextBoardPoint(BoardPoint? boardPoint) {
-    // If before the first element.
-    if (boardPoint == null) {
-      return BoardPoint(-boardRadius, 0);
+  void _fetchImage() async {
+    Image widgetsImage = Image.asset('assets/cave.png');
+    Completer<ui.Image> completer = Completer<ui.Image>();
+    widgetsImage.image
+        .resolve(ImageConfiguration(size: ui.Size(10, 10)))
+        .addListener(ImageStreamListener((ImageInfo info, bool _){
+      completer.complete(info.image);
+    }));
+    completer.future.then((value) {
+      setState(() {
+        _image = value;
+      });
+    });
+  }
+}
+
+// ignore: must_be_immutable
+class GamePage extends StatefulWidget {
+  GamePage(this._image, {Key? key}) : super(key: key);
+
+  late ui.Image _image;
+
+  @override
+  _GamePageState createState() => _GamePageState();
+}
+
+class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
+  // The radius of a hexagon tile in pixels.
+  static const _squareRadius = 32.0;
+  // The margin between hexagons.
+  static const _squareMargin = 0.0;
+  // The radius of the entire board in hexagons, not including the center.
+  static const _boardRadius = 12;
+
+  Board _board = Board(_boardRadius, _squareRadius, _squareMargin, null);
+
+  double _scale = 1.0;
+  bool _firstRender = true;
+  Matrix4? _homeTransformation;
+  final TransformationController _transformationController = TransformationController();
+  Animation<Matrix4>? _animationReset;
+  AnimationController? _controllerReset;
+
+  // Handle reset to home transform animation.
+  void _onAnimateReset() {
+    _transformationController.value = _animationReset!.value;
+    if (!_controllerReset!.isAnimating) {
+      _animationReset?.removeListener(_onAnimateReset);
+      _animationReset = null;
+      _controllerReset!.reset();
     }
-
-    final _Range rRange = _getRRangeForQ(boardPoint.q);
-
-    // If at or after the last element.
-    if (boardPoint.q >= boardRadius && boardPoint.r >= rRange.max) {
-      return null;
-    }
-
-    // If wrapping from one q to the next.
-    if (boardPoint.r >= rRange.max) {
-      return BoardPoint(boardPoint.q + 1, _getRRangeForQ(boardPoint.q + 1).min);
-    }
-
-    // Otherwise we're just incrementing r.
-    return BoardPoint(boardPoint.q, boardPoint.r + 1);
   }
 
-  // Check if the board point is actually on the board.
-  bool _validateBoardPoint(BoardPoint boardPoint) {
-    const BoardPoint center = BoardPoint(0, 0);
-    final int distanceFromCenter = getDistance(center, boardPoint);
-    return distanceFromCenter <= boardRadius;
+  // Initialize the reset to home transform animation.
+  void _animateResetInitialize() {
+    _controllerReset!.reset();
+    _animationReset = Matrix4Tween(
+      begin: _transformationController.value,
+      end: _homeTransformation,
+    ).animate(_controllerReset!);
+    _controllerReset!.duration = const Duration(milliseconds: 400);
+    _animationReset!.addListener(_onAnimateReset);
+    _controllerReset!.forward();
   }
 
-  // Get the distance between two BoardPoins.
-  static int getDistance(BoardPoint a, BoardPoint b) {
-    final Vector3 a3 = a.cubeCoordinates;
-    final Vector3 b3 = b.cubeCoordinates;
-    return ((a3.x - b3.x).abs() + (a3.y - b3.y).abs() + (a3.z - b3.z).abs()) ~/
-        2;
+  // Stop a running reset to home transform animation.
+  void _animateResetStop() {
+    _controllerReset!.stop();
+    _animationReset?.removeListener(_onAnimateReset);
+    _animationReset = null;
+    _controllerReset!.reset();
   }
 
-  // Return the q,r BoardPoint for a point in the scene, where the origin is in
-  // the center of the board in both coordinate systems. If no BoardPoint at the
-  // location, return null.
-  BoardPoint? pointToBoardPoint(Offset point) {
-    final BoardPoint boardPoint = BoardPoint(
-      ((sqrt(3) / 3 * point.dx - 1 / 3 * point.dy) / hexagonRadius).round(),
-      ((2 / 3 * point.dy) / hexagonRadius).round(),
-    );
-
-    if (!_validateBoardPoint(boardPoint)) {
-      return null;
+  void _onScaleStart(ScaleStartDetails details) {
+    // If the user tries to cause a transformation while the reset animation is
+    // running, cancel the reset animation.
+    if (_controllerReset!.status == AnimationStatus.forward) {
+      _animateResetStop();
     }
+  }
 
-    return _boardPoints.firstWhere((boardPointI) {
-      return boardPointI.q == boardPoint.q && boardPointI.r == boardPoint.r;
+  void _onTapUp(TapUpDetails details) {
+    final Offset scenePoint = _transformationController.toScene(details.localPosition);
+    final BoardPoint? boardPoint = _board.pointToBoardPoint(scenePoint);
+    setState(() {
+      _board = _board.copyWithSelected(boardPoint!);
     });
   }
 
-  // Return a scene point for the center of a hexagon given its q,r point.
-  Point<double> boardPointToPoint(BoardPoint boardPoint) {
-    return Point<double>(
-      sqrt(3) * hexagonRadius * boardPoint.q +
-          sqrt(3) / 2 * hexagonRadius * boardPoint.r,
-      1.5 * hexagonRadius * boardPoint.r,
-    );
-  }
-
-  // Get Vertices that can be drawn to a Canvas for the given BoardPoint.
-List getVerticesForBoardPoint(BoardPoint boardPoint, Color color) {
-    final Point<double> centerOfHexZeroCenter = boardPointToPoint(boardPoint);
-
-    final List<Offset> positions = positionsForHexagonAtOrigin.map((offset) {
-      return offset.translate(centerOfHexZeroCenter.x, centerOfHexZeroCenter.y);
-    }).toList();
-
-    return [Vertices(
-      VertexMode.triangles,
-      positions,
-      colors: List<Color>.filled(positions.length, Colors.white),
-    ), positions];
-  }
-
-  // Return a new board with the given BoardPoint selected.
-  Board copyWithSelected(BoardPoint boardPoint) {
-    if (selected == boardPoint) {
-      return this;
-    }
-    final Board nextBoard = Board(
-      boardRadius: boardRadius,
-      hexagonRadius: hexagonRadius,
-      hexagonMargin: hexagonMargin,
-      selected: boardPoint,
-      boardPoints: _boardPoints,
-    );
-    return nextBoard;
-  }
-
-  // Return a new board where boardPoint has the given color.
-  Board copyWithBoardPointColor(BoardPoint boardPoint, Color color) {
-    final BoardPoint nextBoardPoint = boardPoint.copyWithColor(color);
-    final int boardPointIndex = _boardPoints.indexWhere((boardPointI) =>
-    boardPointI.q == boardPoint.q && boardPointI.r == boardPoint.r);
-
-    if (elementAt(boardPointIndex) == boardPoint && boardPoint.color == color) {
-      return this;
-    }
-
-    final List<BoardPoint> nextBoardPoints =
-    List<BoardPoint>.from(_boardPoints);
-    nextBoardPoints[boardPointIndex] = nextBoardPoint;
-    final BoardPoint? selectedBoardPoint =
-    boardPoint == selected ? nextBoardPoint : selected;
-    return Board(
-      boardRadius: boardRadius,
-      hexagonRadius: hexagonRadius,
-      hexagonMargin: hexagonMargin,
-      selected: selectedBoardPoint,
-      boardPoints: nextBoardPoints,
-    );
-  }
-}
-
-class _BoardIterator extends Iterator<BoardPoint?> {
-  _BoardIterator(this.boardPoints);
-
-  late final List<BoardPoint> boardPoints;
-  int? currentIndex;
-
-  @override
-  BoardPoint? current;
-
-  @override
-  bool moveNext() {
-    if (currentIndex == null) {
-      currentIndex = 0;
-    } else {
-      currentIndex = currentIndex! + 1;
-    }
-
-    if (currentIndex! >= boardPoints.length) {
-      current = null;
-      return false;
-    }
-
-    current = boardPoints[currentIndex!];
-    return true;
-  }
-}
-
-// A range of q/r board coordinate values.
-@immutable
-class _Range {
-  const _Range(this.min, this.max)
-      : assert(min != null),
-        assert(max != null),
-        assert(min <= max);
-
-  final int min;
-  final int max;
-}
-
-// A location on the board in axial coordinates.
-// Axial coordinates use two integers, q and r, to locate a hexagon on a grid.
-// https://www.redblobgames.com/grids/hexagons/#coordinates-axial
-@immutable
-class BoardPoint {
-  const BoardPoint(
-      this.q,
-      this.r, {
-        this.color = const Color(0xFFCDCDCD),
+  void _onTransformationChange() {
+    final double currentScale = _transformationController.value.getMaxScaleOnAxis();
+    if (currentScale != _scale) {
+      setState(() {
+        _scale = currentScale;
+        //print(_scale.toString() + "\n");
       });
-
-  final int q;
-  final int r;
-  final Color color;
-
-  @override
-  String toString() {
-    return 'BoardPoint($q, $r, $color)';
-  }
-
-  // Only compares by location.
-  @override
-  bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType) {
-      return false;
     }
-    return other is BoardPoint && other.q == q && other.r == r;
   }
 
   @override
-  int get hashCode => hashValues(q, r);
-
-  BoardPoint copyWithColor(Color nextColor) =>
-      BoardPoint(q, r, color: nextColor);
-
-  // Convert from q,r axial coords to x,y,z cube coords.
-  Vector3 get cubeCoordinates {
-    return Vector3(
-      q.toDouble(),
-      r.toDouble(),
-      (-q - r).toDouble(),
+  void initState() {
+    super.initState();
+    _controllerReset = AnimationController(
+      vsync: this,
     );
+    _transformationController.addListener(_onTransformationChange);
+  }
+
+  @override
+  void didUpdateWidget(GamePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // The scene is drawn by a CustomPaint, but user interaction is handled by
+    // the InteractiveViewer parent widget.
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      appBar: AppBar(
+        title: const Text('MyGameBoard'),
+        actions: <Widget>[resetButton],
+      ),
+      body: Container(
+        color: Colors.grey,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Draw the scene as big as is available, but allow the user to
+            // translate beyond that to a visibleSize that's a bit bigger.
+            final Size viewportSize = Size(
+              constraints.maxWidth,
+              constraints.maxHeight,
+            );
+
+            // The board is drawn centered at the origin, which is the top left
+            // corner in InteractiveViewer, so shift it to the center of the
+            // viewport initially.
+            if (_firstRender) {
+              _firstRender = false;
+              _homeTransformation = Matrix4.identity();
+              _transformationController.value = _homeTransformation!;
+            }
+
+            // TODO(justinmc): There is a bug where the scale gesture doesn't
+            // begin immediately, and it's caused by wrapping IV in a
+            // GestureDetector. Removing the onTapUp fixes it.
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: () {print('justin double');},
+              onTapUp: _onTapUp,
+              child: InteractiveViewer(
+                onInteractionUpdate: (ScaleUpdateDetails details) {
+                  //print('justin onInteractionUpdate ${details.scale}');
+                },
+                transformationController: _transformationController,
+                //boundaryMargin: EdgeInsets.all(500.0),
+                boundaryMargin: EdgeInsets.fromLTRB(
+                  _board.size.width * 2,
+                  _board.size.height * .75,
+                  _board.size.width * 2,
+                  _board.size.height * 4,
+                ),
+                minScale: 0.01,
+                onInteractionStart: _onScaleStart,
+                child: CustomPaint(
+                  size: _board.size,
+                  painter: _BoardPainter(
+                      board: _board,
+                      showDetail: _scale > 1.5,
+                      scale: _scale,
+                      img: widget._image
+                  ),
+                  // This child gives the CustomPaint an intrinsic size.
+                  child: SizedBox(
+                    width: _board.size.width,
+                    height: _board.size.height,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      //persistentFooterButtons: [resetButton, editButton],
+    );
+  }
+
+  IconButton get resetButton {
+    return IconButton(
+      onPressed: () {
+        setState(() {
+          _animateResetInitialize();
+        });
+      },
+      tooltip: 'Reset',
+      color: Theme.of(context).colorScheme.surface,
+      icon: const Icon(Icons.replay),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controllerReset!.dispose();
+    _transformationController.removeListener(_onTransformationChange);
+    super.dispose();
   }
 }
 
+// CustomPainter is what is passed to CustomPaint and actually draws the scene
+// when its `paint` method is called.
+class _BoardPainter extends CustomPainter {
+  const _BoardPainter({
+    required this.board,
+    required this.showDetail,
+    required this.scale,
+    required this.img
+  });
+
+  final bool showDetail;
+  final Board board;
+  final ui.Image img;
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    void drawBoardPoint(BoardPoint? boardPoint) {
+      /*
+      final Color color = boardPoint.color.withOpacity(
+        board.selected == boardPoint ? 0.7 : 1,
+      );
+      */
+      final double opacity = board.selected == boardPoint ? 0.2 : showDetail ? 0.8 : 0.5;
+      Color color = Colors.white;
+      if(boardPoint != null) {
+        List val = board.getVerticesForBoardPoint(boardPoint, color);
+        final ui.Vertices vertices = val[0];
+        List<Offset> positions = val[1];
+        canvas.drawVertices(vertices, BlendMode.color, Paint());
+
+        Offset center = positions[0].translate(
+            positions[0].dx, -positions[0].dx / 2);
+        double width = 32.0;
+        paintImage(canvas: canvas,
+            image: img,
+            rect: Rect.fromPoints(positions[0], positions[5]));
+
+        canvas.drawLine(positions[0], positions[1], Paint());
+        canvas.drawLine(positions[0], positions[4], Paint());
+        canvas.drawLine(positions[4], positions[5], Paint());
+        canvas.drawLine(positions[5], positions[1], Paint());
+      }
+
+      //print((positions[1].dx - positions[0].dx).toString() + " " + (positions[2].dy - positions[0].dy).toString() + "\n");
+
+      /*
+      final ui.ParagraphBuilder paragraphBuilder = ui.ParagraphBuilder(ui.ParagraphStyle(
+        fontSize: 12.0,
+        height: 20.0,
+        maxLines: 1,
+        textAlign: TextAlign.start,
+        textDirection: TextDirection.ltr,
+      ));
+      /*
+      paragraphBuilder.pushStyle(ui.TextStyle(
+        color: Colors.red,
+        fontSize: 12.0,
+        height: 20.0,
+      ));
+      */
+      paragraphBuilder.addText('hello ${boardPoint.q}, ${boardPoint.r}');
+      final ui.Paragraph paragraph = paragraphBuilder.build();
+      final Point<double> textPoint = board.boardPointToPoint(boardPoint);
+      final Offset textOffset = Offset(
+        textPoint.x,
+        textPoint.y,
+      );
+      print('justin draw at $textOffset');
+      canvas.drawParagraph(paragraph, textOffset);
+      */
+    }
+
+    board.forEach(drawBoardPoint);
+  }
+
+  // We should repaint whenever the board changes, such as board.selected.
+  @override
+  bool shouldRepaint(_BoardPainter oldDelegate) {
+    return oldDelegate.board != board;
+  }
+}

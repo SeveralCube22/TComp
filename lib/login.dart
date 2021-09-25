@@ -52,7 +52,10 @@ class LoginScreen extends StatelessWidget {
                           Future<UserCredential> cred = _signInWithGoogle();
                           cred.then((userCred) {
                             if(userCred.additionalUserInfo!.isNewUser)
-                                FirebaseDatabase.instance.reference().child("Users").child(userCred.user!.uid).set(userCred.user!.displayName);
+                              FirebaseDatabase.instance.reference().child("Users").child(userCred.user!.uid).set({
+                                "Name": userCred.user!.displayName,
+                                "Campaigns": ''
+                              });
                             Navigator.pushReplacement(context,
                                 MaterialPageRoute(builder: (context) => HomePage()));
                           });

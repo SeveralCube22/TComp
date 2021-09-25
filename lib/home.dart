@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'login.dart';
-import 'map_page.dart';
+import 'user_campaigns.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -49,7 +49,7 @@ class HomeScreen extends StatelessWidget {
                     children: <Widget>[
                       ElevatedButton(
                           onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => ImageLoader()));
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => Campaign()));
                           },
                           child: Text("My Campaigns")
                       ),
