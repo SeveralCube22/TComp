@@ -5,6 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'maps.dart';
+import 'input.dart';
 
 class Campaign extends StatefulWidget {
   const Campaign({Key? key}) : super(key: key);
@@ -15,6 +17,7 @@ class Campaign extends StatefulWidget {
 
 class _CampaignState extends State<Campaign> {
   var _campaigns = [];
+  String _uid = FirebaseAuth.instance.currentUser!.uid;
 
   _CampaignState() {
     FirebaseDatabase.instance
@@ -35,66 +38,37 @@ class _CampaignState extends State<Campaign> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Campaigns")),
+      appBar: AppBar(title: Text("My Campaigns")),
       body: ListView.builder(
         itemCount: _campaigns.length,
         itemBuilder: (BuildContext context, int index) {
           return Container(
               height: 50,
               margin: EdgeInsets.only(top: 5, bottom: 5, left: 20, right: 20),
-              child: Row(children: [Text("${_campaigns[index]}")]));
+              child: Row(children: [
+                TextButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => Map(uid: _uid, name: _campaigns[index]))),
+                    child: Text("${_campaigns[index]}")
+                )
+              ]));
         },
       ),
       floatingActionButton: FloatingActionButton(
           onPressed: () async {
             String name = await Navigator.push(context,
-                MaterialPageRoute(builder: (context) => CampaignInput()));
+                MaterialPageRoute(builder: (context) => Input(hintText: "Campaign Name")));
             if(name != null){
               _campaigns.add(name);
-              FirebaseDatabase.instance.reference().child("Users").child(FirebaseAuth.instance.currentUser!.uid).child("Campaigns").child(name).set('');
-              FirebaseDatabase.instance.reference().child("Campaigns").child(FirebaseAuth.instance.currentUser!.uid + "_" + name).child("Public").set("F");
+              var root = FirebaseDatabase.instance.reference();
+              root.child("Users").child(_uid).child("Campaigns").child(name).set('');
+              var cRoot = root.child("Campaigns").child("${_uid}_${name}");
+              cRoot.child("Public").set("F");
+              cRoot.child("Maps").set("");
               setState(() {});
-            };
+            }
           },
           tooltip: "Create Campaign",
           child: Icon(Icons.add)),
-    );
-  }
-}
-
-class CampaignInput extends StatefulWidget {
-  const CampaignInput({Key? key}) : super(key: key);
-
-  @override
-  _CampaignInputState createState() => _CampaignInputState();
-}
-
-class _CampaignInputState extends State<CampaignInput> {
-  var name = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-       child: Card(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  TextField(
-                    controller: name,
-                    decoration: InputDecoration(hintText: "Campaign Name"),
-                  )
-                ]
-              )
-            )
-          ),
-      floatingActionButton:
-          FloatingActionButton(
-              onPressed: (){
-                Navigator.pop(context, name.text);
-              },
-              child: Icon(Icons.done)),
     );
   }
 }
