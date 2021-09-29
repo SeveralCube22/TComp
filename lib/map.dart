@@ -1,54 +1,65 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'board.dart';
-// BEGIN transformationsDemo#1
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ImageLoader extends StatefulWidget {
-  const ImageLoader({Key? key}) : super(key: key);
+  const ImageLoader({Key? key, required this.path}) : super(key: key);
+
+  final String path;
+
   @override
   _ImageLoaderState createState() => _ImageLoaderState();
 }
 
 
 class _ImageLoaderState extends State<ImageLoader> {
-  ui.Image? _image = null;
+  HashMap<String, ui.Image?> _images = HashMap();
+  bool _state = false;
 
   @override
   initState(){
     super.initState();
-    _fetchImage();
+    _fetchImages();
   }
 
   @override
   Widget build(BuildContext context) {
-    if(_image != null) //TODO: Maybe a source of bug. Research
-      return GamePage(_image!);
+    if(_state) //TODO: Maybe a source of bug. Research
+      return GamePage(_images);
     else
       return CircularProgressIndicator();
   }
 
-  void _fetchImage() async {
-    Image widgetsImage = Image.asset('assets/cave.png');
-    Completer<ui.Image> completer = Completer<ui.Image>();
-    widgetsImage.image
-        .resolve(ImageConfiguration(size: ui.Size(10, 10)))
-        .addListener(ImageStreamListener((ImageInfo info, bool _){
-      completer.complete(info.image);
-    }));
-    completer.future.then((value) {
-      setState(() {
-        _image = value;
-      });
+  void _fetchImages() async {
+    FirebaseStorage.instance.ref().child(widget.path).listAll().then((res) {
+      List<Reference> refs = res.items;
+      for(int i = 0; i < refs.length; i++){
+        Reference ref = refs[i];
+        ref.getDownloadURL().then((url) async {
+          Completer<ImageInfo> completer = Completer();
+          var img = new NetworkImage(url);
+          img.resolve(ImageConfiguration()).addListener(ImageStreamListener((ImageInfo info,bool _){
+            completer.complete(info);
+          }));
+          completer.future.then((imgInfo) {
+            _images[refs[i].name] = imgInfo.image;
+          });
+        });
+        if(i == refs.length - 1)
+          _state = true;
+      }
     });
   }
 }
 
 // ignore: must_be_immutable
 class GamePage extends StatefulWidget {
-  GamePage(this._image, {Key? key}) : super(key: key);
+  GamePage(this._images, {Key? key}) : super(key: key);
 
-  late ui.Image _image;
+  late HashMap<String, ui.Image?> _images;
 
   @override
   _GamePageState createState() => _GamePageState();
@@ -198,7 +209,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       board: _board,
                       showDetail: _scale > 1.5,
                       scale: _scale,
-                      img: widget._image
+                      images: widget._images
                   ),
                   // This child gives the CustomPaint an intrinsic size.
                   child: SizedBox(
@@ -243,12 +254,12 @@ class _BoardPainter extends CustomPainter {
     required this.board,
     required this.showDetail,
     required this.scale,
-    required this.img
+    required this.images
   });
 
   final bool showDetail;
   final Board board;
-  final ui.Image img;
+  final HashMap<String, ui.Image?> images;
   final double scale;
 
   @override
