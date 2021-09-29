@@ -6,9 +6,10 @@ import 'board.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ImageLoader extends StatefulWidget {
-  const ImageLoader({Key? key, required this.path}) : super(key: key);
+  const ImageLoader({Key? key, required this.path, required this.map}) : super(key: key);
 
   final String path;
+  final List<List<String>> map;
 
   @override
   _ImageLoaderState createState() => _ImageLoaderState();
@@ -17,7 +18,6 @@ class ImageLoader extends StatefulWidget {
 
 class _ImageLoaderState extends State<ImageLoader> {
   HashMap<String, ui.Image?> _images = HashMap();
-  bool _state = false;
 
   @override
   initState(){
@@ -27,13 +27,10 @@ class _ImageLoaderState extends State<ImageLoader> {
 
   @override
   Widget build(BuildContext context) {
-    if(_state) //TODO: Maybe a source of bug. Research
-      return GamePage(_images);
-    else
-      return CircularProgressIndicator();
+    return GamePage(_images, widget.map);
   }
 
-  void _fetchImages() async {
+  void _fetchImages() {
     FirebaseStorage.instance.ref().child(widget.path).listAll().then((res) {
       List<Reference> refs = res.items;
       for(int i = 0; i < refs.length; i++){
@@ -48,8 +45,6 @@ class _ImageLoaderState extends State<ImageLoader> {
             _images[refs[i].name] = imgInfo.image;
           });
         });
-        if(i == refs.length - 1)
-          _state = true;
       }
     });
   }
@@ -57,9 +52,10 @@ class _ImageLoaderState extends State<ImageLoader> {
 
 // ignore: must_be_immutable
 class GamePage extends StatefulWidget {
-  GamePage(this._images, {Key? key}) : super(key: key);
+  GamePage(this._images, this._map, {Key? key}) : super(key: key);
 
   late HashMap<String, ui.Image?> _images;
+  late List<List<String>> _map;
 
   @override
   _GamePageState createState() => _GamePageState();
@@ -209,7 +205,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       board: _board,
                       showDetail: _scale > 1.5,
                       scale: _scale,
-                      images: widget._images
+                      images: widget._images,
+                      map: widget._map
                   ),
                   // This child gives the CustomPaint an intrinsic size.
                   child: SizedBox(
@@ -254,12 +251,14 @@ class _BoardPainter extends CustomPainter {
     required this.board,
     required this.showDetail,
     required this.scale,
-    required this.images
+    required this.images,
+    required this.map
   });
 
   final bool showDetail;
   final Board board;
   final HashMap<String, ui.Image?> images;
+  final List<List<String>> map;
   final double scale;
 
   @override
@@ -281,8 +280,9 @@ class _BoardPainter extends CustomPainter {
         Offset center = positions[0].translate(
             positions[0].dx, -positions[0].dx / 2);
         double width = 32.0;
+
         paintImage(canvas: canvas,
-            image: img,
+            image: images[map[boardPoint.row][boardPoint.col]]!,
             rect: Rect.fromPoints(positions[0], positions[5]));
 
         canvas.drawLine(positions[0], positions[1], Paint());

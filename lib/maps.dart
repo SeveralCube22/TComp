@@ -6,6 +6,7 @@ import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path_provider/path_provider.dart'as path;
 import 'package:permission_handler/permission_handler.dart';
+import 'map.dart';
 
 class Map extends StatefulWidget {
   const Map({Key? key, required this.uid, required this.name})
@@ -61,18 +62,19 @@ class _MapState extends State<Map> {
     var mRoot = root.child("Maps").child("${_uid}_${_name}_${mName}").child("Map Data").child("Map");
     //TODO get rows, cols
 
-    List<List<String>> res = List.empty();
+    List<List<String>> res = [];
     for(int i = 0; i < 12; i++) {
-      List<String> l = List.empty();
+      List<String> l = [];
 
       var root = mRoot.child("${i}").once().then((data) {
         int j = 0;
         data.value.forEach((k, v) {
-          l.add(v);
+          l.add(v.toString());
         });
       });
       res.add(l);
     }
+    return res;
   }
 
   @override
@@ -87,7 +89,7 @@ class _MapState extends State<Map> {
               margin: EdgeInsets.only(top: 5, bottom: 5, left: 20, right: 20),
               child: Row(children: [
                 TextButton(
-                    onPressed: () => null,
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (contex) => ImageLoader(path: "${_uid}_${_name}_${_maps[index]}", map: _loadMap(_maps[index])))),
                     child: Text("${_maps[index]}")
                 )
               ]));

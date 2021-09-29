@@ -94,6 +94,14 @@ class BoardPoint {
   int _col;
   Color? color;
 
+  int get row {
+    return _row;
+  }
+
+  int get col {
+    return _col;
+  }
+
   BoardPoint(this._row, this._col, {this.color});
 
   bool operator ==(Object other) {
