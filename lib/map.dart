@@ -31,8 +31,9 @@ class _ImageLoaderState extends State<ImageLoader> {
   }
 
   void _fetchImages() {
-    FirebaseStorage.instance.ref().child(widget.path).listAll().then((res) {
+    FirebaseStorage.instance.ref().child("${widget.path}/assets/").listAll().then((res) {
       List<Reference> refs = res.items;
+      print(refs[0].name);
       for(int i = 0; i < refs.length; i++){
         Reference ref = refs[i];
         ref.getDownloadURL().then((url) async {
@@ -42,6 +43,7 @@ class _ImageLoaderState extends State<ImageLoader> {
             completer.complete(info);
           }));
           completer.future.then((imgInfo) {
+            print(refs[i].name);
             _images[refs[i].name] = imgInfo.image;
           });
         });

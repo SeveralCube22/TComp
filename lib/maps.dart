@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'dart:io';
-
+import 'dart:collection';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'input.dart';
@@ -56,25 +57,23 @@ class _MapState extends State<Map> {
     }
   }
 
-  List<List<String>> _loadMap(String mName) {
-    var root = FirebaseDatabase.instance.reference();
-    root.child("Campaigns").child("${_uid}_${_name}").child("Maps").child(mName).set('');
-    var mRoot = root.child("Maps").child("${_uid}_${_name}_${mName}").child("Map Data").child("Map");
-    //TODO get rows, cols
-
-    List<List<String>> res = [];
-    for(int i = 0; i < 12; i++) {
-      List<String> l = [];
-
-      var root = mRoot.child("${i}").once().then((data) {
-        int j = 0;
-        data.value.forEach((k, v) {
-          l.add(v.toString());
-        });
-      });
-      res.add(l);
+  Future<List<List<String>>> _loadMap(String mName) async {
+    DataSnapshot data = await FirebaseDatabase.instance.reference().child("Maps").child("${_uid}_${_name}_${mName}").child("Map Data").get();
+    var values = data.value;
+    var mapValues = values["Map"];
+    List<List<String>> map = [];
+    for(int i = 0; i < 12; i++) { //TODO get rows and cols
+      List<String> row = [];
+      for(int j = 0; j < 12; j++) {
+        row.add(mapValues[i][j]);
+      }
+      map.add(row);
     }
-    return res;
+
+    var completer = Completer<List<List<String>>>();
+    completer.complete(map);
+
+    return completer.future;
   }
 
   @override
@@ -89,7 +88,11 @@ class _MapState extends State<Map> {
               margin: EdgeInsets.only(top: 5, bottom: 5, left: 20, right: 20),
               child: Row(children: [
                 TextButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (contex) => ImageLoader(path: "${_uid}_${_name}_${_maps[index]}", map: _loadMap(_maps[index])))),
+                    onPressed: () {
+                      _loadMap(_maps[index]).then((map) {
+                        Navigator.push(context, MaterialPageRoute(builder: (contex) => ImageLoader(path: "${_uid}_${_name}_${_maps[index]}", map: map)));
+                      });
+                    },
                     child: Text("${_maps[index]}")
                 )
               ]));
@@ -116,7 +119,8 @@ class _MapState extends State<Map> {
 
               File file = File('/storage/emulated/0/Download/cave.png');
               //print(file.readAsString());
-              FirebaseStorage.instance.ref().child("${_uid}_${_name}_${mName}").putFile(file);
+              var name = "cave.png"; //TODO change
+              FirebaseStorage.instance.ref().child("${_uid}_${_name}_${mName}/assets/${name}/").putFile(file);
 
               setState(() {});
             }
