@@ -28,17 +28,53 @@ class _CampaignState extends State<Campaign> {
         .once()
         .then((dataSnapshot) {
       dataSnapshot.value.forEach((k, v) {
-        print("DATA:" + k);
         _campaigns.add(k.toString());
       });
       setState(() {});
     });
   }
 
+  Future<void> _showInvite() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Invitation"),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: const <Widget>[
+                Text('This is a demo alert dialog.'),
+                Text('Would you like to approve of this message?'),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("Play"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("My Campaigns")),
+      appBar: AppBar(
+          title: Text("My Campaigns"),
+          actions: <Widget>[
+            Padding(
+                padding: EdgeInsets.only(right: 20.0),
+                child: GestureDetector(
+                  onTap: () => _showInvite(),
+                  child: Icon(Icons.insert_link_sharp, size: 30.0, color: Colors.white),
+            ))
+      ]),
       body: ListView.builder(
         itemCount: _campaigns.length,
         itemBuilder: (BuildContext context, int index) {
@@ -47,20 +83,30 @@ class _CampaignState extends State<Campaign> {
               margin: EdgeInsets.only(top: 5, bottom: 5, left: 20, right: 20),
               child: Row(children: [
                 TextButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => Map(uid: _uid, name: _campaigns[index]))),
-                    child: Text("${_campaigns[index]}")
-                )
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                Map(uid: _uid, name: _campaigns[index]))),
+                    child: Text("${_campaigns[index]}"))
               ]));
         },
       ),
       floatingActionButton: FloatingActionButton(
           onPressed: () async {
-            String name = await Navigator.push(context,
-                MaterialPageRoute(builder: (context) => Input(hintText: "Campaign Name")));
-            if(name != null){
+            String name = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => Input(hintText: "Campaign Name")));
+            if (name != null) {
               _campaigns.add(name);
               var root = FirebaseDatabase.instance.reference();
-              root.child("Users").child(_uid).child("Campaigns").child(name).set('');
+              root
+                  .child("Users")
+                  .child(_uid)
+                  .child("Campaigns")
+                  .child(name)
+                  .set('');
               var cRoot = root.child("Campaigns").child("${_uid}_${name}");
               cRoot.child("Public").set("F");
               cRoot.child("Maps").set("");
