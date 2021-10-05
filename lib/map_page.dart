@@ -5,7 +5,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path_provider/path_provider.dart'as path;
+import 'package:path_provider/path_provider.dart' as path;
 import 'package:permission_handler/permission_handler.dart';
 import 'map.dart';
 
@@ -24,7 +24,8 @@ class _MapState extends State<Map> {
   String _uid;
   String _name;
 
-  var _maps = [];
+  List<String> _maps = [];
+  HashMap<String, String> _sessions = HashMap();
 
   _MapState(this._uid, this._name) {
     FirebaseDatabase.instance
@@ -35,11 +36,26 @@ class _MapState extends State<Map> {
         .once()
         .then((dataSnapshot) {
       dataSnapshot.value.forEach((k, v) {
-        print("DATA:" + k);
         _maps.add(k.toString());
       });
 
       setState(() {});
+    });
+
+    FirebaseDatabase.instance
+        .reference()
+        .child("Campaigns")
+        .child(_uid + "_" + _name)
+        .child("Sessions")
+        .once()
+        .then((dataSnapshot) {
+      dataSnapshot.value.forEach((k, v) {
+        _sessions.putIfAbsent(k.toString(), () => "");
+      });
+
+      setState(() {
+        _sessions.putIfAbsent("Test", () => "");
+      });
     });
   }
 
@@ -51,20 +67,26 @@ class _MapState extends State<Map> {
         'Map': '',
       }
     });
-    for(int i = 0; i < 12; i++){
+    for (int i = 0; i < 12; i++) {
       var row = List.generate(12, (index) => "cave.png");
       mRoot.child("Map Data").child("Map").child("${i}").set(row);
     }
   }
 
   Future<List<List<String>>> _loadMap(String mName) async {
-    DataSnapshot data = await FirebaseDatabase.instance.reference().child("Maps").child("${_uid}_${_name}_${mName}").child("Map Data").get();
+    DataSnapshot data = await FirebaseDatabase.instance
+        .reference()
+        .child("Maps")
+        .child("${_uid}_${_name}_${mName}")
+        .child("Map Data")
+        .get();
     var values = data.value;
     var mapValues = values["Map"];
     List<List<String>> map = [];
-    for(int i = 0; i < 12; i++) { //TODO get rows and cols
+    for (int i = 0; i < 12; i++) {
+      //TODO get rows and cols
       List<String> row = [];
-      for(int j = 0; j < 12; j++) {
+      for (int j = 0; j < 12; j++) {
         row.add(mapValues[i][j]);
       }
       map.add(row);
@@ -76,10 +98,85 @@ class _MapState extends State<Map> {
     return completer.future;
   }
 
+  Future<void> _showInvite() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        var sessionController = TextEditingController();
+
+        _sessions["TEST"] = "TST";
+        return AlertDialog(
+          title: Text("Invitation"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: <Widget>[
+                Row(mainAxisSize: MainAxisSize.max, children: <Widget>[
+
+                  Expanded(child: TextField(
+                      controller: sessionController,
+                      decoration:
+                          InputDecoration(hintText: "Session"))),
+                  Padding(
+                      padding: EdgeInsets.only(right: 20.0),
+                      child: DropdownButton<String>(
+                        hint:  Icon(
+                            Icons.arrow_drop_down,
+                            size: 30.0,
+                            color: Colors.white
+                        ),
+                        onChanged: (String? session) {
+                          setState(() {
+                            if(session != null) sessionController.text = session;
+                          });
+                          },
+                        items: _sessions.keys.map((String session) {
+                          return  DropdownMenuItem<String>(
+                            value: session,
+                            child: Row(
+                              children: <Widget>[
+                                SizedBox(width: 10,),
+                                Text(
+                                  session,
+                                  style:  TextStyle(color: Colors.black),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      )
+                  )
+                ])
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("Play"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_name)),
+      appBar: AppBar(title: Text(_name), actions: <Widget>[
+        Padding(
+            padding: EdgeInsets.only(right: 20.0),
+            child: GestureDetector(
+              onTap: () => _showInvite(),
+              child: Icon(Icons.insert_link_sharp,
+                  size: 30.0, color: Colors.white),
+            ))
+      ]),
       body: ListView.builder(
         itemCount: _maps.length,
         itemBuilder: (BuildContext context, int index) {
@@ -90,22 +187,33 @@ class _MapState extends State<Map> {
                 TextButton(
                     onPressed: () {
                       _loadMap(_maps[index]).then((map) {
-                        Navigator.push(context, MaterialPageRoute(builder: (contex) => ImageLoader(path: "${_uid}_${_name}_${_maps[index]}", map: map)));
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (contex) => ImageLoader(
+                                    path: "${_uid}_${_name}_${_maps[index]}",
+                                    map: map)));
                       });
                     },
-                    child: Text("${_maps[index]}")
-                )
+                    child: Text("${_maps[index]}"))
               ]));
         },
       ),
       floatingActionButton: FloatingActionButton(
           onPressed: () async {
-            String mName = await Navigator.push(context,
-                MaterialPageRoute(builder: (context) => Input(hintText: "Map Name")));
-            if(mName != null){
+            String mName = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => Input(hintText: "Map Name")));
+            if (mName != null) {
               _maps.add(mName);
               var root = FirebaseDatabase.instance.reference();
-              root.child("Campaigns").child("${_uid}_${_name}").child("Maps").child(mName).set('');
+              root
+                  .child("Campaigns")
+                  .child("${_uid}_${_name}")
+                  .child("Maps")
+                  .child(mName)
+                  .set('');
               var mRoot = root.child("Maps").child("${_uid}_${_name}_${mName}");
               mRoot.child("Public").set("F");
               mRoot.child("Maps").set("");
@@ -116,11 +224,13 @@ class _MapState extends State<Map> {
                 await Permission.storage.request();
               }
 
-
               File file = File('/storage/emulated/0/Download/cave.png');
               //print(file.readAsString());
               var name = "cave.png"; //TODO change
-              FirebaseStorage.instance.ref().child("${_uid}_${_name}_${mName}/assets/${name}/").putFile(file);
+              FirebaseStorage.instance
+                  .ref()
+                  .child("${_uid}_${_name}_${mName}/assets/${name}/")
+                  .putFile(file);
 
               setState(() {});
             }
@@ -130,5 +240,3 @@ class _MapState extends State<Map> {
     );
   }
 }
-
-

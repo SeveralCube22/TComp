@@ -1,5 +1,4 @@
 import 'dart:ffi';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -34,47 +33,10 @@ class _CampaignState extends State<Campaign> {
     });
   }
 
-  Future<void> _showInvite() async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false, // user must tap button!
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("Invitation"),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: const <Widget>[
-                Text('This is a demo alert dialog.'),
-                Text('Would you like to approve of this message?'),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text("Play"),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          title: Text("My Campaigns"),
-          actions: <Widget>[
-            Padding(
-                padding: EdgeInsets.only(right: 20.0),
-                child: GestureDetector(
-                  onTap: () => _showInvite(),
-                  child: Icon(Icons.insert_link_sharp, size: 30.0, color: Colors.white),
-            ))
-      ]),
+      appBar: AppBar(title: Text("My Campaigns")),
       body: ListView.builder(
         itemCount: _campaigns.length,
         itemBuilder: (BuildContext context, int index) {
@@ -110,6 +72,7 @@ class _CampaignState extends State<Campaign> {
               var cRoot = root.child("Campaigns").child("${_uid}_${name}");
               cRoot.child("Public").set("F");
               cRoot.child("Maps").set("");
+              cRoot.child("Sessions").set("");
               setState(() {});
             }
           },
