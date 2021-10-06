@@ -5,7 +5,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path_provider/path_provider.dart' as path;
+import 'package:nanoid/nanoid.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'map.dart';
 
@@ -104,7 +105,7 @@ class _MapState extends State<Map> {
       barrierDismissible: false, // user must tap button!
       builder: (BuildContext context) {
         var sessionController = TextEditingController();
-
+        var currId = "";
         _sessions["TEST"] = "TST";
         return AlertDialog(
           title: Text("Invitation"),
@@ -113,42 +114,79 @@ class _MapState extends State<Map> {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.start,
               children: <Widget>[
-                Row(mainAxisSize: MainAxisSize.max, children: <Widget>[
-
-                  Expanded(child: TextField(
-                      controller: sessionController,
-                      decoration:
-                          InputDecoration(hintText: "Session"))),
-                  Padding(
-                      padding: EdgeInsets.only(right: 20.0),
-                      child: DropdownButton<String>(
-                        hint:  Icon(
-                            Icons.arrow_drop_down,
-                            size: 30.0,
-                            color: Colors.white
-                        ),
-                        onChanged: (String? session) {
-                          setState(() {
-                            if(session != null) sessionController.text = session;
-                          });
-                          },
-                        items: _sessions.keys.map((String session) {
-                          return  DropdownMenuItem<String>(
-                            value: session,
-                            child: Row(
-                              children: <Widget>[
-                                SizedBox(width: 10,),
-                                Text(
-                                  session,
-                                  style:  TextStyle(color: Colors.black),
+                Row(
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      Flexible(
+                          child: TextField(
+                              controller: sessionController,
+                              onSubmitted: (value) {
+                                if(_sessions.containsKey(value)) {
+                                  Fluttertoast.showToast(
+                                    msg: "Session already exists",
+                                    toastLength: Toast.LENGTH_LONG,
+                                    gravity: ToastGravity.BOTTOM,
+                                    timeInSecForIosWeb: 1
+                                  );
+                                }
+                                else
+                                  setState(() {
+                                    _sessions.putIfAbsent(value, () => "");
+                                    var id = nanoid(10);
+                                    currId = id;
+                                    FirebaseDatabase.instance
+                                        .reference()
+                                        .child("Campaigns")
+                                        .child(_uid + "_" + _name)
+                                        .child("Sessions")
+                                        .child(value)
+                                        .set({
+                                          "Link" : id,
+                                          "Players" : ""
+                                        });
+                                  });
+                              },
+                              decoration: InputDecoration(hintText: "Session"))),
+                      Padding(
+                          padding: EdgeInsets.only(top: 16.0),
+                          child: DropdownButton<String>(
+                            hint: Icon(
+                                Icons.arrow_drop_down,
+                                size: 30.0,
+                                color: Colors.white),
+                            onChanged: (String? session) {
+                              setState(() async {
+                                if (session != null) {
+                                  sessionController.text = session;
+                                  var data = await FirebaseDatabase.instance
+                                                        .reference()
+                                                        .child("Campaigns")
+                                                        .child(_uid + "_" + _name)
+                                                        .child("Sessions")
+                                                        .child(session).get();
+                                  currId = data.value;
+                                }
+                              });
+                            },
+                            items: _sessions.keys.map((String session) {
+                              return DropdownMenuItem<String>(
+                                value: session,
+                                child: Row(
+                                  children: <Widget>[
+                                    SizedBox(
+                                      width: 10,
+                                    ),
+                                    Text(
+                                      session,
+                                      style: TextStyle(color: Colors.black),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      )
-                  )
-                ])
+                              );
+                            }).toList(),
+                          ))
+                    ]),
+                Text("ASDF " + currId)
               ],
             ),
           ),
