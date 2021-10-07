@@ -5,10 +5,9 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:nanoid/nanoid.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'map.dart';
+import 'invitation_page.dart';
 
 class Map extends StatefulWidget {
   const Map({Key? key, required this.uid, required this.name})
@@ -179,104 +178,4 @@ class _MapState extends State<Map> {
   }
 }
 
-class Invitation extends StatefulWidget {
-  const Invitation(
-      {Key? key, required this.sessions, required this.uid, required this.name})
-      : super(key: key);
 
-  final HashMap<String, String> sessions;
-  final String uid, name;
-
-  @override
-  _InvitationState createState() => _InvitationState();
-}
-
-class _InvitationState extends State<Invitation> {
-  var sessionController = TextEditingController();
-  var currId = "";
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Invitation")),
-      body: Center(
-        child: Wrap(alignment: WrapAlignment.center, runSpacing: 30, children: <Widget>[
-          Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.max,
-              children: <Widget>[
-                Flexible(
-                    child: Container(
-                        width: 100.0,
-                        child: TextField(
-                            controller: sessionController,
-                            onSubmitted: (value) {
-                              if (widget.sessions.containsKey(value)) {
-                                Fluttertoast.showToast(
-                                    msg: "Session already exists",
-                                    toastLength: Toast.LENGTH_LONG,
-                                    gravity: ToastGravity.BOTTOM,
-                                    timeInSecForIosWeb: 1);
-                              } else
-                                setState(() {
-                                  widget.sessions.putIfAbsent(value, () => "");
-                                  var id = nanoid(10);
-                                  currId = id;
-                                  FirebaseDatabase.instance
-                                      .reference()
-                                      .child("Campaigns")
-                                      .child(widget.uid + "_" + widget.name)
-                                      .child("Sessions")
-                                      .child(value)
-                                      .set({"Link": id, "Players": ""});
-                                });
-                            },
-                            decoration: InputDecoration(hintText: "Session")))),
-                Padding(
-                    padding: EdgeInsets.only(top: 16.0),
-                    child: DropdownButton<String>(
-                      hint: Icon(Icons.arrow_drop_down,
-                          size: 30.0, color: Colors.white),
-                      onChanged: (String? session) async {
-                        if (session != null) {
-                          var data = await FirebaseDatabase.instance
-                              .reference()
-                              .child("Campaigns")
-                              .child(widget.uid + "_" + widget.name)
-                              .child("Sessions")
-                              .child(session)
-                              .child("Link")
-                              .get();
-                          setState(() {
-                            sessionController.text = session;
-                            currId = data.value;
-                          });
-                        }
-                      },
-                      items: widget.sessions.keys.map((String session) {
-                        return DropdownMenuItem<String>(
-                          value: session,
-                          child: Row(
-                            children: <Widget>[
-                              SizedBox(
-                                width: 10,
-                              ),
-                              Text(
-                                session,
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ))
-              ]),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[Text("Session Link: "), SelectableText(currId)],
-          )
-        ]),
-      ),
-    );
-  }
-}
