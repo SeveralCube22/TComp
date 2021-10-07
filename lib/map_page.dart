@@ -99,110 +99,6 @@ class _MapState extends State<Map> {
     return completer.future;
   }
 
-  Future<void> _showInvite() async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false, // user must tap button!
-      builder: (BuildContext context) {
-        var sessionController = TextEditingController();
-        var currId = "";
-        _sessions["TEST"] = "TST";
-        return AlertDialog(
-          title: Text("Invitation"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                    mainAxisSize: MainAxisSize.max,
-                    children: <Widget>[
-                      Flexible(
-                          child: TextField(
-                              controller: sessionController,
-                              onSubmitted: (value) {
-                                if(_sessions.containsKey(value)) {
-                                  Fluttertoast.showToast(
-                                    msg: "Session already exists",
-                                    toastLength: Toast.LENGTH_LONG,
-                                    gravity: ToastGravity.BOTTOM,
-                                    timeInSecForIosWeb: 1
-                                  );
-                                }
-                                else
-                                  setState(() {
-                                    _sessions.putIfAbsent(value, () => "");
-                                    var id = nanoid(10);
-                                    currId = id;
-                                    FirebaseDatabase.instance
-                                        .reference()
-                                        .child("Campaigns")
-                                        .child(_uid + "_" + _name)
-                                        .child("Sessions")
-                                        .child(value)
-                                        .set({
-                                          "Link" : id,
-                                          "Players" : ""
-                                        });
-                                  });
-                              },
-                              decoration: InputDecoration(hintText: "Session"))),
-                      Padding(
-                          padding: EdgeInsets.only(top: 16.0),
-                          child: DropdownButton<String>(
-                            hint: Icon(
-                                Icons.arrow_drop_down,
-                                size: 30.0,
-                                color: Colors.white),
-                            onChanged: (String? session) {
-                              setState(() async {
-                                if (session != null) {
-                                  sessionController.text = session;
-                                  var data = await FirebaseDatabase.instance
-                                                        .reference()
-                                                        .child("Campaigns")
-                                                        .child(_uid + "_" + _name)
-                                                        .child("Sessions")
-                                                        .child(session).get();
-                                  currId = data.value;
-                                }
-                              });
-                            },
-                            items: _sessions.keys.map((String session) {
-                              return DropdownMenuItem<String>(
-                                value: session,
-                                child: Row(
-                                  children: <Widget>[
-                                    SizedBox(
-                                      width: 10,
-                                    ),
-                                    Text(
-                                      session,
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ))
-                    ]),
-                Text("ASDF " + currId)
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text("Play"),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,7 +106,11 @@ class _MapState extends State<Map> {
         Padding(
             padding: EdgeInsets.only(right: 20.0),
             child: GestureDetector(
-              onTap: () => _showInvite(),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => Invitation(
+                          sessions: _sessions, uid: _uid, name: _name))),
               child: Icon(Icons.insert_link_sharp,
                   size: 30.0, color: Colors.white),
             ))
@@ -275,6 +175,108 @@ class _MapState extends State<Map> {
           },
           tooltip: "Create Map",
           child: Icon(Icons.add)),
+    );
+  }
+}
+
+class Invitation extends StatefulWidget {
+  const Invitation(
+      {Key? key, required this.sessions, required this.uid, required this.name})
+      : super(key: key);
+
+  final HashMap<String, String> sessions;
+  final String uid, name;
+
+  @override
+  _InvitationState createState() => _InvitationState();
+}
+
+class _InvitationState extends State<Invitation> {
+  var sessionController = TextEditingController();
+  var currId = "";
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Invitation")),
+      body: Center(
+        child: Wrap(alignment: WrapAlignment.center, runSpacing: 30, children: <Widget>[
+          Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.max,
+              children: <Widget>[
+                Flexible(
+                    child: Container(
+                        width: 100.0,
+                        child: TextField(
+                            controller: sessionController,
+                            onSubmitted: (value) {
+                              if (widget.sessions.containsKey(value)) {
+                                Fluttertoast.showToast(
+                                    msg: "Session already exists",
+                                    toastLength: Toast.LENGTH_LONG,
+                                    gravity: ToastGravity.BOTTOM,
+                                    timeInSecForIosWeb: 1);
+                              } else
+                                setState(() {
+                                  widget.sessions.putIfAbsent(value, () => "");
+                                  var id = nanoid(10);
+                                  currId = id;
+                                  FirebaseDatabase.instance
+                                      .reference()
+                                      .child("Campaigns")
+                                      .child(widget.uid + "_" + widget.name)
+                                      .child("Sessions")
+                                      .child(value)
+                                      .set({"Link": id, "Players": ""});
+                                });
+                            },
+                            decoration: InputDecoration(hintText: "Session")))),
+                Padding(
+                    padding: EdgeInsets.only(top: 16.0),
+                    child: DropdownButton<String>(
+                      hint: Icon(Icons.arrow_drop_down,
+                          size: 30.0, color: Colors.white),
+                      onChanged: (String? session) async {
+                        if (session != null) {
+                          var data = await FirebaseDatabase.instance
+                              .reference()
+                              .child("Campaigns")
+                              .child(widget.uid + "_" + widget.name)
+                              .child("Sessions")
+                              .child(session)
+                              .child("Link")
+                              .get();
+                          setState(() {
+                            sessionController.text = session;
+                            currId = data.value;
+                          });
+                        }
+                      },
+                      items: widget.sessions.keys.map((String session) {
+                        return DropdownMenuItem<String>(
+                          value: session,
+                          child: Row(
+                            children: <Widget>[
+                              SizedBox(
+                                width: 10,
+                              ),
+                              Text(
+                                session,
+                                style: TextStyle(color: Colors.black),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ))
+              ]),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[Text("Session Link: "), SelectableText(currId)],
+          )
+        ]),
+      ),
     );
   }
 }
