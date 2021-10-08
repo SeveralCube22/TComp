@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'login_page.dart';
 import 'campaign_page.dart';
+import 'join_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -55,7 +56,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                       ElevatedButton(
                           onPressed: () {
-
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => Join()));
                           },
                           child: Text("Join Campaign")
                       )

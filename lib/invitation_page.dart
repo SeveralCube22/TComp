@@ -86,13 +86,16 @@ class _InvitationState extends State<Invitation> {
                           setState(() {
                             sessionController.text = session;
                             currId = data.value;
-                            HashMap<dynamic, dynamic> values = playerData.value;
-                            values.forEach((key, value) {
-                              HashMap<dynamic, dynamic> player = value;
-                              String name = player["Name"];
-                              bool status = player["Status"];
-                              players.add(Player(name, status));
-                            });
+                            try {
+                              var values = playerData.value;
+                              values.forEach((key, value) {
+                                String name = key;
+                                var player = value;
+                                bool status = player["Status"];
+                                players.add(Player(name, status));
+                              });
+                            }
+                            catch(e) {}
                           });
                         }
                       },
@@ -123,18 +126,17 @@ class _InvitationState extends State<Invitation> {
             child: ListView.builder(
                 itemCount: players.length,
                 itemBuilder: (context, index) {
-                  return Row(     //TODO implement delete functionality
-                    children: <Widget>[
-                      Icon(
-                        Icons.circle,
-                        color: (players[index].status ? Colors.green : Colors.red),
-                        size: 30.0
-                      ),
-                      Text(players[index].name)
-                    ]
+                  return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.circle,
+                            color: (players[index].status ? Colors.green : Colors.red),
+                            size: 20.0),
+                        Text(players[index].name)
+                      ]
                   );
                 }
-            )
+            ),
           ),
           ElevatedButton(onPressed:() => null, child: Text("Play"))
         ]),
