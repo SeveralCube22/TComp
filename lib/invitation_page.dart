@@ -76,26 +76,31 @@ class _InvitationState extends State<Invitation> {
                               .child(session)
                               .child("Link")
                               .get();
-                          var playerData = await FirebaseDatabase.instance
-                              .reference()
-                              .child("Sessions")
-                              .child(data.value)
-                              .child("Players")
-                              .get();
+
+                          FirebaseDatabase.instance.reference().child("Sessions").child(data.value).child("Players").onChildChanged.listen((event) {
+                            FirebaseDatabase.instance
+                                .reference()
+                                .child("Sessions")
+                                .child(data.value)
+                                .child("Players")
+                                .once().then((data) {
+                                  List<Player> temp = [];
+                                  data.value.forEach((key, value) {
+                                    String name = key;
+                                    var player = value;
+                                    bool status = player["Status"];
+                                    temp.add(Player(name, status));
+                                  });
+                                  players = temp;
+                                  setState(() {
+
+                                  });
+                            });
+                          });
 
                           setState(() {
                             sessionController.text = session;
                             currId = data.value;
-                            try {
-                              var values = playerData.value;
-                              values.forEach((key, value) {
-                                String name = key;
-                                var player = value;
-                                bool status = player["Status"];
-                                players.add(Player(name, status));
-                              });
-                            }
-                            catch(e) {}
                           });
                         }
                       },
