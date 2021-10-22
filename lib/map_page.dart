@@ -54,7 +54,7 @@ class _MapState extends State<Map> {
       });
 
       setState(() {
-        _sessions.putIfAbsent("Test", () => "");
+
       });
     });
   }

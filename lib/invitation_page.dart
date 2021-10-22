@@ -21,6 +21,27 @@ class _InvitationState extends State<Invitation> {
   var currId = "";
   List<Player> players = [];
 
+  void _refreshPlayers() {
+    FirebaseDatabase.instance
+        .reference()
+        .child("Sessions")
+        .child(currId)
+        .child("Players")
+        .once().then((data) {
+      List<Player> temp = [];
+      data.value.forEach((key, value) {
+        String name = key;
+        var player = value;
+        bool status = player["Status"];
+        temp.add(Player(name, status));
+      });
+      players = temp;
+      setState(() {
+
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,31 +98,13 @@ class _InvitationState extends State<Invitation> {
                               .child("Link")
                               .get();
 
-                          FirebaseDatabase.instance.reference().child("Sessions").child(data.value).child("Players").onChildChanged.listen((event) {
-                            FirebaseDatabase.instance
-                                .reference()
-                                .child("Sessions")
-                                .child(data.value)
-                                .child("Players")
-                                .once().then((data) {
-                                  List<Player> temp = [];
-                                  data.value.forEach((key, value) {
-                                    String name = key;
-                                    var player = value;
-                                    bool status = player["Status"];
-                                    temp.add(Player(name, status));
-                                  });
-                                  players = temp;
-                                  setState(() {
-
-                                  });
-                            });
-                          });
-
                           setState(() {
                             sessionController.text = session;
                             currId = data.value;
                           });
+
+                          _refreshPlayers();
+                          FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
                         }
                       },
                       items: widget.sessions.keys.map((String session) {
