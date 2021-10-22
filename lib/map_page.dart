@@ -51,7 +51,6 @@ class _MapState extends State<Map> {
         .then((dataSnapshot) {
       dataSnapshot.value.forEach((k, v) {
         _session = k.toString();
-        print("HERE: ${_session}");
       });
 
       setState(() {

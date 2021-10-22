@@ -27,14 +27,32 @@ class _InvitationState extends State<Invitation> {
     super.initState();
     sessionWidget = widget.session == null ? _buildSessionWidget(true) : _buildSessionWidget(false);
     if(widget.session != null) {
-      var future = _getCurrId();
-      future.then((value) {
-        setState(() {
-          currId = value;
-        });
+      _getCurrId().then((value) {
+        currId = value;
+        _refreshPlayers();
+        FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
       });
     }
+  }
 
+  void _refreshPlayers() {
+    FirebaseDatabase.instance
+        .reference()
+        .child("Sessions")
+        .child(currId)
+        .child("Players")
+        .once().then((data) {
+      List<Player> temp = [];
+      data.value.forEach((key, value) {
+        String name = key;
+        var player = value;
+        bool status = player["Status"];
+        temp.add(Player(name, status));
+      });
+      players = temp;
+      setState(() {
+      });
+    });
   }
 
   Future<String> _getCurrId() async {
