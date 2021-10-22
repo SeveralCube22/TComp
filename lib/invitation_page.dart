@@ -105,6 +105,7 @@ class _InvitationState extends State<Invitation> {
 
                           _refreshPlayers();
                           FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
+
                         }
                       },
                       items: widget.sessions.keys.map((String session) {
