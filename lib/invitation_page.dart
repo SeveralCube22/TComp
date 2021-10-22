@@ -18,6 +18,7 @@ class Invitation extends StatefulWidget {
 
 class _InvitationState extends State<Invitation> {
   Widget? sessionWidget;
+  bool sessionEdit = true;
 
   String currId = "";
   List<Player> players = [];
@@ -33,6 +34,7 @@ class _InvitationState extends State<Invitation> {
         });
       });
     }
+
   }
 
   Future<String> _getCurrId() async {
@@ -59,19 +61,23 @@ class _InvitationState extends State<Invitation> {
             child: TextField(
                 controller: controller,
                 enabled: edit,
+
                 onSubmitted: (value) {
                   setState(() {
-                    var id = nanoid(10);
-                    currId = id;
-                    var root = FirebaseDatabase.instance.reference();
-                    root.child("Campaigns")
-                        .child(widget.uid + "_" + widget.name)
-                        .child("Sessions")
-                        .child(value)
-                        .set({"Link": id});
-                    root.child("Sessions")
-                        .child(id)
-                        .set({"Players": "", "In Session": false});
+                    if(sessionEdit) { // Temporary solution to prevent adding sessions every time user changes and clicks enter
+                      var id = nanoid(10);
+                      currId = id;
+                      var root = FirebaseDatabase.instance.reference();
+                      root.child("Campaigns")
+                          .child(widget.uid + "_" + widget.name)
+                          .child("Sessions")
+                          .child(value)
+                          .set({"Link": id});
+                      root.child("Sessions")
+                          .child(id)
+                          .set({"Players": "", "In Session": false});
+                      sessionEdit = false;
+                    }
                   });
                 },
                 decoration: InputDecoration(hintText: edit ? "Session" : ""))));
