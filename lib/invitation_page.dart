@@ -6,10 +6,10 @@ import 'dart:collection';
 
 class Invitation extends StatefulWidget {
   const Invitation(
-      {Key? key, required this.session, required this.uid, required this.name})
+      {Key? key, required this.sessions, required this.uid, required this.name})
       : super(key: key);
 
-  final String? session;
+  final HashMap<String, String> sessions;
   final String uid, name;
 
   @override
@@ -17,23 +17,9 @@ class Invitation extends StatefulWidget {
 }
 
 class _InvitationState extends State<Invitation> {
-  Widget? sessionWidget;
-  bool sessionEdit = true;
-
-  String currId = "";
+  var sessionController = TextEditingController();
+  var currId = "";
   List<Player> players = [];
-
-  void initState() {
-    super.initState();
-    sessionWidget = widget.session == null ? _buildSessionWidget(true) : _buildSessionWidget(false);
-    if(widget.session != null) {
-      _getCurrId().then((value) {
-        currId = value;
-        _refreshPlayers();
-        FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
-      });
-    }
-  }
 
   void _refreshPlayers() {
     FirebaseDatabase.instance
@@ -51,56 +37,10 @@ class _InvitationState extends State<Invitation> {
       });
       players = temp;
       setState(() {
+
       });
     });
   }
-
-  Future<String> _getCurrId() async {
-    var session = await FirebaseDatabase.instance.reference()
-        .child("Campaigns")
-        .child(widget.uid + "_" + widget.name)
-        .child("Sessions")
-        .child(widget.session!)
-        .child("Link")
-        .get();
-
-    return session.value;
-  }
-
-  /* TODO
-      - Text field is still editable after on submit.
-   */
-  Widget _buildSessionWidget(bool edit) {
-    var controller = TextEditingController();
-    controller.text = edit ? "" : widget.session!;
-    return Flexible(
-        child: Container(
-            width: 100.0,
-            child: TextField(
-                controller: controller,
-                enabled: edit,
-
-                onSubmitted: (value) {
-                  setState(() {
-                    if(sessionEdit) { // Temporary solution to prevent adding sessions every time user changes and clicks enter
-                      var id = nanoid(10);
-                      currId = id;
-                      var root = FirebaseDatabase.instance.reference();
-                      root.child("Campaigns")
-                          .child(widget.uid + "_" + widget.name)
-                          .child("Sessions")
-                          .child(value)
-                          .set({"Link": id});
-                      root.child("Sessions")
-                          .child(id)
-                          .set({"Players": "", "In Session": false});
-                      sessionEdit = false;
-                    }
-                  });
-                },
-                decoration: InputDecoration(hintText: edit ? "Session" : ""))));
-  }
-
 
   @override
   Widget build(BuildContext context) {
@@ -112,10 +52,83 @@ class _InvitationState extends State<Invitation> {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.max,
               children: <Widget>[
-                sessionWidget!, ]),
+                Flexible(
+                    child: Container(
+                        width: 100.0,
+                        child: TextField(
+                            controller: sessionController,
+                            onSubmitted: (value) {
+                              if (widget.sessions.containsKey(value)) {
+                                Fluttertoast.showToast(
+                                    msg: "Session already exists",
+                                    toastLength: Toast.LENGTH_LONG,
+                                    gravity: ToastGravity.BOTTOM,
+                                    timeInSecForIosWeb: 1);
+                              } else
+                                setState(() {
+                                  widget.sessions.putIfAbsent(value, () => "");
+                                  var id = nanoid(10);
+                                  currId = id;
+                                  var root = FirebaseDatabase.instance
+                                      .reference();
+                                  root.child("Campaigns")
+                                      .child(widget.uid + "_" + widget.name)
+                                      .child("Sessions")
+                                      .child(value)
+                                      .set({"Link": id});
+                                  root.child("Sessions")
+                                      .child(id)
+                                      .set({"Players": "", "In Session": false});
+                                });
+                            },
+                            decoration: InputDecoration(hintText: "Session")))),
+                Padding(
+                    padding: EdgeInsets.only(top: 16.0),
+                    child: DropdownButton<String>(
+                      hint: Icon(Icons.arrow_drop_down,
+                          size: 30.0, color: Colors.white),
+                      onChanged: (String? session) async {
+                        if (session != null) {
+                          var data = await FirebaseDatabase.instance
+                              .reference()
+                              .child("Campaigns")
+                              .child(widget.uid + "_" + widget.name)
+                              .child("Sessions")
+                              .child(session)
+                              .child("Link")
+                              .get();
+
+                          setState(() {
+                            sessionController.text = session;
+                            currId = data.value;
+                          });
+
+                          _refreshPlayers();
+                          FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
+                        }
+                      },
+                      items: widget.sessions.keys.map((String session) {
+                        return DropdownMenuItem<String>(
+                          value: session,
+                          child: Row(
+                            children: <Widget>[
+                              SizedBox(
+                                width: 10,
+                              ),
+                              Text(
+                                session,
+                                style: TextStyle(color: Colors.black),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ))
+              ]),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[Text("Session Link: "), SelectableText(currId)],),
+            children: <Widget>[Text("Session Link: "), SelectableText(currId)],
+          ),
           Container(
             height: 200,
             child: ListView.builder(
@@ -146,6 +159,3 @@ class Player {
 
   Player(this.name, this.status);
 }
-
-
-
