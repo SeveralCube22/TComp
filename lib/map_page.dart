@@ -25,7 +25,7 @@ class _MapState extends State<Map> {
   String _name;
 
   List<String> _maps = [];
-  HashMap<String, String> _sessions = HashMap();
+  String? _session;
 
   _MapState(this._uid, this._name) {
     FirebaseDatabase.instance
@@ -50,11 +50,11 @@ class _MapState extends State<Map> {
         .once()
         .then((dataSnapshot) {
       dataSnapshot.value.forEach((k, v) {
-        _sessions.putIfAbsent(k.toString(), () => "");
+        _session = k.toString();
+        print("HERE: ${_session}");
       });
 
       setState(() {
-        _sessions.putIfAbsent("Test", () => "");
       });
     });
   }
@@ -108,8 +108,7 @@ class _MapState extends State<Map> {
               onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => Invitation(
-                          sessions: _sessions, uid: _uid, name: _name))),
+                      builder: (context) => Invitation(session: _session, uid: _uid, name: _name))),
               child: Icon(Icons.insert_link_sharp,
                   size: 30.0, color: Colors.white),
             ))

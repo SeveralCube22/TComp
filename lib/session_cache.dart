@@ -13,9 +13,7 @@ class SessionCache {
     Map<Object?, Object?> data = sessions.value;
     Map<String, Object?> rData = data.cast<String, Object?>();
 
-    print("TEST");
     if(rData.containsKey(link)) {
-      print("HERE: ${sessionLink}");
       if (sessionLink != null) {
         root.child(sessionLink!).child("Players").child(displayName!).set({"Status": false});
       }
