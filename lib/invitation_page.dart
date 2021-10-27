@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import 'package:nanoid/nanoid.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:collection';
+import 'player.dart';
 
 class Invitation extends StatefulWidget {
   const Invitation(
@@ -19,6 +20,8 @@ class Invitation extends StatefulWidget {
 class _InvitationState extends State<Invitation> {
   var sessionController = TextEditingController();
   var currId = "";
+  String? currSession;
+
   List<Player> players = [];
 
   void _refreshPlayers() {
@@ -33,7 +36,7 @@ class _InvitationState extends State<Invitation> {
         String name = key;
         var player = value;
         bool status = player["Status"];
-        temp.add(Player(name, status));
+        temp.add(Player(name, currId, status));
       });
       players = temp;
       setState(() {
@@ -69,6 +72,7 @@ class _InvitationState extends State<Invitation> {
                                   widget.sessions.putIfAbsent(value, () => "");
                                   var id = nanoid(10);
                                   currId = id;
+                                  currSession = value;
                                   var root = FirebaseDatabase.instance
                                       .reference();
                                   root.child("Campaigns")
@@ -101,11 +105,11 @@ class _InvitationState extends State<Invitation> {
                           setState(() {
                             sessionController.text = session;
                             currId = data.value;
+                            currSession = session;
                           });
 
                           _refreshPlayers();
                           FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
-
                         }
                       },
                       items: widget.sessions.keys.map((String session) {
@@ -147,16 +151,27 @@ class _InvitationState extends State<Invitation> {
                 }
             ),
           ),
-          ElevatedButton(onPressed:() => null, child: Text("Play"))
+          ElevatedButton(
+              onPressed:() {
+                Result res = Result();
+                if(currSession == null)
+                  res.inSession = false;
+                else {
+                  res.inSession = true;
+                  res.session = currSession!;
+                  res.players = players;
+                }
+                Navigator.pop(context, res);
+              },
+              child: Text("Play"))
         ]),
       ),
     );
   }
 }
 
-class Player {
-  String name;
-  bool status;
-
-  Player(this.name, this.status);
+class Result {
+  late bool inSession;
+  late String session;
+  var players;
 }

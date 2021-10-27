@@ -23,6 +23,9 @@ class Map extends StatefulWidget {
 class _MapState extends State<Map> {
   String _uid;
   String _name;
+  bool inSession = false;
+  String? session = null;
+  var players = [];
 
   List<String> _maps = [];
   HashMap<String, String> _sessions = HashMap();
@@ -98,22 +101,35 @@ class _MapState extends State<Map> {
     return completer.future;
   }
 
+  AppBar buildAppBar() {
+    Widget w;
+    if (inSession)
+      w = Center(child: Text(session!, textScaleFactor: 1.5,),);
+    else {
+      w = GestureDetector(
+        onTap: () async {
+          Result res = await Navigator.push(context, MaterialPageRoute(builder: (context) =>
+                      Invitation(sessions: _sessions, uid: _uid, name: _name)));
+          if(res.inSession) {
+            setState(() {
+              inSession = true;
+              session = res.session;
+              players = res.players;
+            });
+          }
+        },
+        child: Icon(Icons.insert_link_sharp, size: 30.0, color: Colors.white),
+      );
+    }
+    return AppBar(title: Text(_name), actions: <Widget>[
+      Padding(padding: EdgeInsets.only(right: 20.0), child: w)
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_name), actions: <Widget>[
-        Padding(
-            padding: EdgeInsets.only(right: 20.0),
-            child: GestureDetector(
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => Invitation(
-                          sessions: _sessions, uid: _uid, name: _name))),
-              child: Icon(Icons.insert_link_sharp,
-                  size: 30.0, color: Colors.white),
-            ))
-      ]),
+      appBar: buildAppBar(),
       body: ListView.builder(
         itemCount: _maps.length,
         itemBuilder: (BuildContext context, int index) {
