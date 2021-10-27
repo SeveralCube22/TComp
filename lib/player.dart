@@ -18,6 +18,16 @@ class Player {
                     .set(map);
   }
 
+  void removePlayer(String map) {
+    FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(_session)
+        .child("Players")
+        .child(_name)
+        .child("Map")
+        .set("");
+  }
+
   String get name => _name;
   bool get status => _status;
 }

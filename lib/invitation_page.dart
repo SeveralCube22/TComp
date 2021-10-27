@@ -173,5 +173,5 @@ class _InvitationState extends State<Invitation> {
 class Result {
   late bool inSession;
   late String session;
-  var players;
+  late List<Player> players;
 }

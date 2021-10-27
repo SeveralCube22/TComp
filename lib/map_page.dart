@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:collection';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'player.dart';
 import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -25,7 +26,7 @@ class _MapState extends State<Map> {
   String _name;
   bool inSession = false;
   String? session = null;
-  var players = [];
+  List<PlayerState> players = [];
 
   List<String> _maps = [];
   HashMap<String, String> _sessions = HashMap();
@@ -114,7 +115,9 @@ class _MapState extends State<Map> {
             setState(() {
               inSession = true;
               session = res.session;
-              players = res.players;
+              res.players.forEach((element) {
+                players.add(PlayerState(element, null));
+              });
             });
           }
         },
@@ -124,6 +127,69 @@ class _MapState extends State<Map> {
     return AppBar(title: Text(_name), actions: <Widget>[
       Padding(padding: EdgeInsets.only(right: 20.0), child: w)
     ]);
+  }
+
+  Future<void> _showMyDialog(List<PlayerState> players, String map) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Load Players"),
+          content: Container(
+            width: 100,
+            height: 100,
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) => Column(
+                  children: <Widget>[
+                    ListView.builder(
+                        itemCount: players.length,
+                        scrollDirection: Axis.vertical,
+                        shrinkWrap: true,
+                        itemBuilder: (BuildContext context, int index) {
+                          players[index].state = players[index].currMap == map;
+                          print("HERE ${players[index].state}");
+                          return CheckboxListTile(
+                              title: Text("${players[index].player.name} ${players[index].currMap == null ? "" : "(In ${players[index].currMap!.split("_")[2]})"}"),
+                              value: players[index].state,
+                              onChanged: (newValue) {
+                                print("${newValue}");
+                                if(newValue != null) {
+                                  if(newValue) {
+                                    players[index].player.putPlayer(map);
+                                    setState(() {
+                                      players[index].currMap = map;
+                                      players[index].state = true;
+                                      print("STATE ${players[index].state}");
+                                    });
+                                  }
+                                  else {
+                                    players[index].player.removePlayer(map);
+                                    setState(() {
+                                      players[index].currMap = null;
+                                      players[index].state = true;
+                                    });
+                                  }
+                                }
+                              },
+                              controlAffinity: ListTileControlAffinity.leading,  //  <-- leading Checkbox
+                          );
+                        })
+                  ],
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("Done"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -147,6 +213,12 @@ class _MapState extends State<Map> {
                                     path: "${_uid}_${_name}_${_maps[index]}",
                                     map: map)));
                       });
+                    },
+                    onLongPress: () {
+                      if(inSession) {
+                        String map = "${_uid}_${_name}_${_maps[index]}";
+                        _showMyDialog(players, map);
+                      }
                     },
                     child: Text("${_maps[index]}"))
               ]));
@@ -192,6 +264,15 @@ class _MapState extends State<Map> {
           child: Icon(Icons.add)),
     );
   }
+}
+
+class PlayerState {
+  Player player;
+  String? currMap;
+  late bool state;
+
+  PlayerState(this.player, this.currMap);
+
 }
 
 
