@@ -8,20 +8,21 @@ import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'map.dart';
+import 'map_membership.dart';
 import 'invitation_page.dart';
 
-class Map extends StatefulWidget {
-  const Map({Key? key, required this.uid, required this.name})
+class MapPage extends StatefulWidget {
+  const MapPage({Key? key, required this.uid, required this.name})
       : super(key: key);
 
   final String uid;
   final String name;
 
   @override
-  _MapState createState() => _MapState(uid, name);
+  _MapPageState createState() => _MapPageState(uid, name);
 }
 
-class _MapState extends State<Map> {
+class _MapPageState extends State<MapPage> {
   String _uid;
   String _name;
   bool inSession = false;
@@ -31,7 +32,7 @@ class _MapState extends State<Map> {
   List<String> _maps = [];
   HashMap<String, String> _sessions = HashMap();
 
-  _MapState(this._uid, this._name) {
+  _MapPageState(this._uid, this._name) {
     FirebaseDatabase.instance
         .reference()
         .child("Campaigns")
@@ -61,45 +62,6 @@ class _MapState extends State<Map> {
 
       });
     });
-  }
-
-  _initMap(var mRoot) {
-    mRoot.set({
-      "Map Data": {
-        'Rows': 12,
-        'Cols': 12,
-        'Map': '',
-      }
-    });
-    for (int i = 0; i < 12; i++) {
-      var row = List.generate(12, (index) => "cave.png");
-      mRoot.child("Map Data").child("Map").child("${i}").set(row);
-    }
-  }
-
-  Future<List<List<String>>> _loadMap(String mName) async {
-    DataSnapshot data = await FirebaseDatabase.instance
-        .reference()
-        .child("Maps")
-        .child("${_uid}_${_name}_${mName}")
-        .child("Map Data")
-        .get();
-    var values = data.value;
-    var mapValues = values["Map"];
-    List<List<String>> map = [];
-    for (int i = 0; i < 12; i++) {
-      //TODO get rows and cols
-      List<String> row = [];
-      for (int j = 0; j < 12; j++) {
-        row.add(mapValues[i][j]);
-      }
-      map.add(row);
-    }
-
-    var completer = Completer<List<List<String>>>();
-    completer.complete(map);
-
-    return completer.future;
   }
 
   AppBar buildAppBar() {
@@ -205,7 +167,7 @@ class _MapState extends State<Map> {
               child: Row(children: [
                 TextButton(
                     onPressed: () {
-                      _loadMap(_maps[index]).then((map) {
+                      Map.loadMap("${_uid}_${_name}_${_maps[index]}").then((map) {
                         Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -242,7 +204,7 @@ class _MapState extends State<Map> {
               var mRoot = root.child("Maps").child("${_uid}_${_name}_${mName}");
               mRoot.child("Public").set("F");
               mRoot.child("Maps").set("");
-              _initMap(mRoot);
+              Map.initMap(mRoot);
 
               var status = await Permission.storage.status;
               if (!status.isGranted) {

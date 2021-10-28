@@ -49,7 +49,7 @@ class _CampaignState extends State<Campaign> {
                         context,
                         MaterialPageRoute(
                             builder: (context) =>
-                                Map(uid: _uid, name: _campaigns[index]))),
+                                MapPage(uid: _uid, name: _campaigns[index]))),
                     child: Text("${_campaigns[index]}"))
               ]));
         },
