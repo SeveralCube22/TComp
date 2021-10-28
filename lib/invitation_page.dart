@@ -160,6 +160,11 @@ class _InvitationState extends State<Invitation> {
                   res.inSession = true;
                   res.session = currSession!;
                   res.players = players;
+                  FirebaseDatabase.instance.reference() // TODO session cache to detect when DM leaves session
+                                  .child("Sessions")
+                                  .child(currId)
+                                  .child("In Session")
+                                  .set(true);
                 }
                 Navigator.pop(context, res);
               },
