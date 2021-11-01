@@ -7,7 +7,7 @@ import 'player.dart';
 import 'input.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'map.dart';
+import 'map_board.dart';
 import 'map_membership.dart';
 import 'invitation_page.dart';
 
@@ -115,14 +115,12 @@ class _MapPageState extends State<MapPage> {
                               title: Text("${players[index].player.name} ${players[index].currMap == null ? "" : "(In ${players[index].currMap!.split("_")[2]})"}"),
                               value: players[index].state,
                               onChanged: (newValue) {
-                                print("${newValue}");
                                 if(newValue != null) {
                                   if(newValue) {
                                     players[index].player.putPlayer(map);
                                     setState(() {
                                       players[index].currMap = map;
                                       players[index].state = true;
-                                      print("STATE ${players[index].state}");
                                     });
                                   }
                                   else {

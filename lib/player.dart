@@ -16,6 +16,13 @@ class Player {
                     .child(_name)
                     .child("Map")
                     .set(map);
+    FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(_session)
+        .child("Maps")
+        .child(map)
+        .child(_name)
+        .set({"Pos": {"x": 0, "y": 0}});
   }
 
   void removePlayer(String map) {
@@ -26,6 +33,13 @@ class Player {
         .child(_name)
         .child("Map")
         .set("");
+    FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(_session)
+        .child("Maps")
+        .child(map)
+        .child(_name)
+        .remove();
   }
 
   String get name => _name;

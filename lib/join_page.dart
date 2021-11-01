@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'map.dart';
+import 'map_board.dart';
 import 'session_cache.dart';
 import 'map_membership.dart';
 
