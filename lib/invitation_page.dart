@@ -82,7 +82,7 @@ class _InvitationState extends State<Invitation> {
                                       .set({"Link": id});
                                   root.child("Sessions")
                                       .child(id)
-                                      .set({"Players": "", "In Session": false});
+                                      .set({"Players": "", "In Session":  {"In Session": false }});
                                 });
                             },
                             decoration: InputDecoration(hintText: "Session")))),
@@ -163,6 +163,7 @@ class _InvitationState extends State<Invitation> {
                   FirebaseDatabase.instance.reference() // TODO session cache to detect when DM leaves session
                                   .child("Sessions")
                                   .child(currId)
+                                  .child("In Session")
                                   .child("In Session")
                                   .set(true);
                 }

@@ -37,12 +37,9 @@ class _JoinState extends State<Join> {
                     SessionCache.displayName = name!;
                     SessionCache.setSession(value).then((join) {
                       if(join) {
-                        FirebaseDatabase.instance.reference()
-                            .child("Sessions")
-                            .child(value)
-                            .child("In Session")
-                            .onChildChanged.listen((event) => refreshMap());
-                       buildLoading();
+                        setState(() {
+                          currentWidget = buildStream();
+                        });
                       }
                       else {
                         Fluttertoast.showToast(
@@ -52,7 +49,6 @@ class _JoinState extends State<Join> {
                             timeInSecForIosWeb: 1);
                       }
                     });
-
                   },
                 )
               ],
@@ -62,10 +58,22 @@ class _JoinState extends State<Join> {
     });
   }
 
-  void buildLoading() {
-    setState(() {
-      currentWidget = Center(child: Text("Wait for host..."));
-    });
+ Widget buildStream() {
+    return StreamBuilder(
+      stream: FirebaseDatabase.instance.reference()
+          .child("Sessions")
+          .child(SessionCache.sessionLink!)
+          .child("In Session")
+          .onChildChanged,
+      builder: (BuildContext context, AsyncSnapshot<Event> snapshot) {
+        print("HERE: ${snapshot.data}");
+        return snapshot.data == null ? buildLoading() : buildMap();
+      },
+    );
+  }
+
+  Widget buildLoading() {
+    return Center(child: Text("Wait for host..."));
   }
 
   Future<List<List<String>>> loadMap() async {
@@ -84,12 +92,18 @@ class _JoinState extends State<Join> {
       return Map.loadMap(currentMap!);
   }
 
-  void refreshMap() {
-    loadMap().then((map) {
-      setState(() {
-        currentWidget = ImageLoader(path: currentMap!, map: map);
-      });
-    });
+ Future<Widget> refreshMap() async {
+    List<List<String>> map = await loadMap();
+    return ImageLoader(path: currentMap!, map: map);
+  }
+
+  Widget buildMap() {
+    return FutureBuilder(
+      future: refreshMap(),
+      builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+        return snapshot.hasData ? snapshot.data : buildLoading();
+      },
+    );
   }
 
 
