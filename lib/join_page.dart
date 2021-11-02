@@ -1,9 +1,13 @@
 import 'dart:collection';
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:image_picker/image_picker.dart';
 import 'map_board.dart';
+import 'player.dart';
 import 'session_cache.dart';
 import 'map_membership.dart';
 
@@ -16,7 +20,9 @@ class Join extends StatefulWidget {
 
 class _JoinState extends State<Join> {
   late Widget currentWidget;
+  late Player player;
   late String? currentMap;
+  late XFile? avatar;
 
   @override
   void initState() {
@@ -31,31 +37,51 @@ class _JoinState extends State<Join> {
         body: Center(
             child: Column(
               children: <Widget>[
-                TextField(
-                  onSubmitted: (value) async {
-                    String? name = FirebaseAuth.instance.currentUser!.displayName;
-                    SessionCache.displayName = name!;
-                    SessionCache.setSession(value).then((join) {
-                      if(join) {
+                Container(
+                  width: 150,
+                  child: TextField(
+                    onSubmitted: (value) async {
+                      String? name = FirebaseAuth.instance.currentUser!.displayName;
+                      SessionCache.displayName = name!;
+                      SessionCache.setSession(value).then((join) {
+                        if(!join) {
+                          Fluttertoast.showToast(
+                              msg: "Session link does not exist",
+                              toastLength: Toast.LENGTH_LONG,
+                              gravity: ToastGravity.BOTTOM,
+                              timeInSecForIosWeb: 1);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.only(bottom: 50),
+                  child: ElevatedButton(
+                      onPressed: () => getAvatar(),
+                      child: Text("Choose avatar")
+                  )
+                ),
+                ElevatedButton(
+                    onPressed:() {
+                      if(SessionCache.sessionLink != null && avatar != null) {
                         setState(() {
+                          player = Player(SessionCache.displayName!, SessionCache.sessionLink!, true);
                           currentWidget = buildStream();
                         });
                       }
-                      else {
-                        Fluttertoast.showToast(
-                            msg: "Session link does not exist",
-                            toastLength: Toast.LENGTH_LONG,
-                            gravity: ToastGravity.BOTTOM,
-                            timeInSecForIosWeb: 1);
-                      }
-                    });
-                  },
-                )
+                    },
+                    child: Text("Play"))
               ],
             )
         ),
       );
     });
+  }
+
+  void getAvatar() async {
+    ImagePicker picker = ImagePicker();
+    avatar = await picker.pickImage(source: ImageSource.gallery);
   }
 
  Widget buildStream() {
@@ -66,7 +92,6 @@ class _JoinState extends State<Join> {
           .child("In Session")
           .onChildChanged,
       builder: (BuildContext context, AsyncSnapshot<Event> snapshot) {
-        print("HERE: ${snapshot.data}");
         return snapshot.data == null ? buildLoading() : buildMap();
       },
     );
@@ -87,14 +112,16 @@ class _JoinState extends State<Join> {
         .get();
 
       setState(() {
-        currentMap = data.value;
+        currentMap = data.value; // currentMap not equal to PATH
+        player.map = data.value;
+        player.storeAvatar(avatar!);
       });
       return Map.loadMap(currentMap!);
   }
 
  Future<Widget> refreshMap() async {
     List<List<String>> map = await loadMap();
-    return ImageLoader(path: currentMap!, map: map);
+    return ImageLoader(path: currentMap!, map: map, player: player, session: player.session);
   }
 
   Widget buildMap() {

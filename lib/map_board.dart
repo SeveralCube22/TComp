@@ -1,63 +1,133 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'dart:collection';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'board.dart';
+import 'player.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ImageLoader extends StatefulWidget {
-  const ImageLoader({Key? key, required this.path, required this.map}) : super(key: key);
+  const ImageLoader({Key? key, required this.path, required this.map, required this.mapName, required this.session, required this.player}) : super(key: key);
 
-  final String path;
+  final String? path;
   final List<List<String>> map;
+  final String mapName;
+  final String? session;
+  final Player? player;
 
   @override
   _ImageLoaderState createState() => _ImageLoaderState();
 }
 
+enum Objects {
+  Player,
+  Object,
+}
+
+class MapObj {
+  String? name;
+  Objects? type;
+  bool occupied;
+
+  MapObj(this.name, this.type, this.occupied);
+}
 
 class _ImageLoaderState extends State<ImageLoader> {
   HashMap<String, ui.Image?> _images = HashMap();
+  late List<List<MapObj>> objMap;
+
 
   @override
   initState(){
     super.initState();
-    _fetchImages();
+   // _fetchBackgroundImages();
+    objMap = List.generate(widget.map.length, (i) =>
+        List.generate(
+            widget.map[i].length, (index) => MapObj(null, null, false)));
+    if(widget.session != null) {
+      _fetchObjectImages(true);
+      _fetchObjectImages(false);
+      _buildObjectMap(true);
+      _buildObjectMap(false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GamePage(_images, widget.map);
+    return GamePage(_images, widget.map, objMap);
   }
 
-  void _fetchImages() {
-    FirebaseStorage.instance.ref().child("${widget.path}/assets/").listAll().then((res) {
-      List<Reference> refs = res.items;
-      print(refs[0].name);
-      for(int i = 0; i < refs.length; i++){
-        Reference ref = refs[i];
-        ref.getDownloadURL().then((url) async {
-          Completer<ImageInfo> completer = Completer();
-          var img = new NetworkImage(url);
-          img.resolve(ImageConfiguration()).addListener(ImageStreamListener((ImageInfo info,bool _){
-            completer.complete(info);
-          }));
-          completer.future.then((imgInfo) {
-            print(refs[i].name);
-            _images[refs[i].name] = imgInfo.image;
-          });
+  void _fetchBackgroundImages() async {
+    ListResult res = await FirebaseStorage.instance.ref().child("${widget.path}/assets/").listAll();
+    List<Reference> refs = res.items;
+    for (int i = 0; i < refs.length; i++) {
+      Reference ref = refs[i];
+      ref.getDownloadURL().then((url) async {
+        Completer<ImageInfo> completer = Completer();
+        var img = new NetworkImage(url);
+        img.resolve(ImageConfiguration()).addListener(ImageStreamListener((ImageInfo info, bool _) {
+          completer.complete(info);
+        }));
+        completer.future.then((imgInfo) {
+          print(refs[i].name);
+          _images[refs[i].name] = imgInfo.image;
         });
-      }
-    });
+      });
+    }
+  }
+
+  void _fetchObjectImages(bool player) async {
+    ListResult res =  await FirebaseStorage.instance.ref().child("Sessions/${widget.session}/${widget.mapName}/${player ? "Players" : "Objects"}").listAll();
+    List<Reference> refs = res.items;
+    for (int i = 0; i < refs.length; i++) {
+      Reference ref = refs[i];
+      print("BUILD IMAGE ${ref.name}");
+      ref.getDownloadURL().then((url) async {
+        Completer<ImageInfo> completer = Completer();
+        var img = new NetworkImage(url);
+        img.resolve(ImageConfiguration()).addListener(
+            ImageStreamListener((ImageInfo info, bool _) {
+              completer.complete(info);
+            }));
+        completer.future.then((imgInfo) {
+          _images[ref.name] = imgInfo.image;
+        });
+      });
+    }
+  }
+
+  void _buildObjectMap(bool player) async {
+   DataSnapshot data = await FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(widget.session!)
+        .child("Maps")
+        .child(widget.mapName)
+        .child("${player ? "Players" : "Objects"}")
+        .get();
+
+   HashMap<dynamic, dynamic> map = HashMap.from(data.value);
+   map.forEach((key, value) {
+     MapObj map = MapObj("${key.toString()}.png", player ? Objects.Player : Objects.Object, true);
+     int x = value["Pos"]["x"];
+     int y = value["Pos"]["y"];
+     print("BUILD MAP: ${x} ${y}");
+     setState(() {
+       objMap[x][y] = map;
+     });
+   });
   }
 }
 
+
+
 // ignore: must_be_immutable
 class GamePage extends StatefulWidget {
-  GamePage(this._images, this._map, {Key? key}) : super(key: key);
+  GamePage(this._images, this._map, this._objMap, {Key? key}) : super(key: key);
 
   late HashMap<String, ui.Image?> _images;
   late List<List<String>> _map;
+  late List<List<MapObj>> _objMap;
 
   @override
   _GamePageState createState() => _GamePageState();
@@ -208,7 +278,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       showDetail: _scale > 1.5,
                       scale: _scale,
                       images: widget._images,
-                      map: widget._map
+                      map: widget._map,
+                      objMap: widget._objMap
                   ),
                   // This child gives the CustomPaint an intrinsic size.
                   child: SizedBox(
@@ -254,13 +325,15 @@ class _BoardPainter extends CustomPainter {
     required this.showDetail,
     required this.scale,
     required this.images,
-    required this.map
+    required this.map,
+    required this.objMap
   });
 
   final bool showDetail;
   final Board board;
   final HashMap<String, ui.Image?> images;
   final List<List<String>> map;
+  final List<List<MapObj>> objMap;
   final double scale;
 
   @override
@@ -283,9 +356,18 @@ class _BoardPainter extends CustomPainter {
             positions[0].dx, -positions[0].dx / 2);
         double width = 32.0;
 
-        paintImage(canvas: canvas,
-            image: images[map[boardPoint.row][boardPoint.col]]!,
-            rect: Rect.fromPoints(positions[0], positions[5]));
+        var bgImg = images[map[boardPoint.row][boardPoint.col]];
+        if(bgImg != null)
+          paintImage(canvas: canvas,
+              image: bgImg,
+              rect: Rect.fromPoints(positions[0], positions[5]));
+
+        MapObj m = objMap[boardPoint.row][boardPoint.col];
+        if(m.occupied) {
+          var objImg = images[m.name];
+          if(objImg != null)
+            paintImage(canvas: canvas, image: objImg, rect: Rect.fromPoints(positions[0], positions[5]));
+        }
 
         canvas.drawLine(positions[0], positions[1], Paint());
         canvas.drawLine(positions[0], positions[4], Paint());
