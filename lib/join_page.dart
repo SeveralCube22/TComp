@@ -36,6 +36,7 @@ class _JoinState extends State<Join> {
         appBar: AppBar(title: Text("Join")),
         body: Center(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Container(
                   width: 150,
