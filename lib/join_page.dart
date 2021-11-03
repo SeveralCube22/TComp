@@ -112,7 +112,7 @@ class _JoinState extends State<Join> {
         .get();
 
       setState(() {
-        currentMap = data.value; // currentMap not equal to PATH
+        currentMap = data.value;
         player.map = data.value;
         player.storeAvatar(avatar!);
       });
@@ -121,7 +121,7 @@ class _JoinState extends State<Join> {
 
  Future<Widget> refreshMap() async {
     List<List<String>> map = await loadMap();
-    return ImageLoader(path: currentMap!, map: map, player: player, session: player.session);
+    return ImageLoader(path: currentMap!, player: player, session: player.session, map: map);
   }
 
   Widget buildMap() {

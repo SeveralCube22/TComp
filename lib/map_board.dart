@@ -8,11 +8,10 @@ import 'player.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ImageLoader extends StatefulWidget {
-  const ImageLoader({Key? key, required this.path, required this.map, required this.mapName, required this.session, required this.player}) : super(key: key);
+  const ImageLoader({Key? key, required this.path, required this.map, required this.session, required this.player}) : super(key: key);
 
-  final String? path;
+  final String path;
   final List<List<String>> map;
-  final String mapName;
   final String? session;
   final Player? player;
 
@@ -37,11 +36,10 @@ class _ImageLoaderState extends State<ImageLoader> {
   HashMap<String, ui.Image?> _images = HashMap();
   late List<List<MapObj>> objMap;
 
-
   @override
   initState(){
     super.initState();
-   // _fetchBackgroundImages();
+    _fetchBackgroundImages();
     objMap = List.generate(widget.map.length, (i) =>
         List.generate(
             widget.map[i].length, (index) => MapObj(null, null, false)));
@@ -78,7 +76,7 @@ class _ImageLoaderState extends State<ImageLoader> {
   }
 
   void _fetchObjectImages(bool player) async {
-    ListResult res =  await FirebaseStorage.instance.ref().child("Sessions/${widget.session}/${widget.mapName}/${player ? "Players" : "Objects"}").listAll();
+    ListResult res =  await FirebaseStorage.instance.ref().child("Sessions/${widget.session}/${player ? "Players" : "Objects"}/${widget.path}/").listAll();
     List<Reference> refs = res.items;
     for (int i = 0; i < refs.length; i++) {
       Reference ref = refs[i];
@@ -102,7 +100,7 @@ class _ImageLoaderState extends State<ImageLoader> {
         .child("Sessions")
         .child(widget.session!)
         .child("Maps")
-        .child(widget.mapName)
+        .child(widget.path)
         .child("${player ? "Players" : "Objects"}")
         .get();
 

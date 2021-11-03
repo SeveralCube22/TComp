@@ -171,9 +171,9 @@ class _MapPageState extends State<MapPage> {
                             MaterialPageRoute(
                                 builder: (contex) => ImageLoader(
                                     path: "${_uid}_${_name}_${_maps[index]}",
-                                    mapName: _maps[index],
-                                    map: map,
-                                    player: null, session: inSession ? session : null,)));
+                                    player: null,
+                                    session: inSession ? session : null,
+                                    map: map)));
                       });
                     },
                     onLongPress: () {
