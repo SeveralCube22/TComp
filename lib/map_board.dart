@@ -350,10 +350,6 @@ class _BoardPainter extends CustomPainter {
         List<Offset> positions = val[1];
         canvas.drawVertices(vertices, BlendMode.color, Paint());
 
-        Offset center = positions[0].translate(
-            positions[0].dx, -positions[0].dx / 2);
-        double width = 32.0;
-
         var bgImg = images[map[boardPoint.row][boardPoint.col]];
         if(bgImg != null)
           paintImage(canvas: canvas,
