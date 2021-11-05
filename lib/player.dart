@@ -78,10 +78,11 @@ class Player {
     HashMap<dynamic, dynamic> mPlayers = HashMap.from(m.value);
     mPlayers.forEach((key, value) {
       if(playerNames.containsKey(key)) {
-        Pos startPos = Pos(value["SPos"]["x"], value["Spos"]["y"]);
-        Pos endPos = Pos(value["EPos"]["x"], value["Epos"]["y"]);
+        Pos startPos = Pos(value["SPos"]["x"], value["SPos"]["y"]);
+        Pos endPos = Pos(value["EPos"]["x"], value["EPos"]["y"]);
 
         Player player = Player(key, session, true);
+        player._map = map;
         player._start = startPos;
         player._end = endPos;
         players.add(player);
@@ -91,7 +92,7 @@ class Player {
     return players;
   }
 
-  void move() async {
+  void move() {
     var root = FirebaseDatabase.instance.reference()
         .child("Sessions")
         .child(_session)
@@ -100,34 +101,39 @@ class Player {
         .child("Players")
         .child(name);
 
-    var endPos = await root.child("EPos").get();
-    Pos end = Pos(endPos.value["x"], endPos.value["y"]);
-    if(_start != end) {
-      if(_end != end || _path == null) {
-        _end = end;
-        _generatePath();
+    root.child("EPos").get().then((endPos) {
+      Pos end = Pos(endPos.value["x"], endPos.value["y"]);
+      if(_start != end) {
+        if(_end != end || _path == null) {
+          _end = end;
+          _generatePath();
+        }
+        _start = _path!.first;
+        _path!.removeAt(0);
       }
-      _start = _path!.first;
-      _path!.removeAt(0);
-    }
+    });
   }
 
   void _generatePath() { // TODO pathfind with obstacles
     _path = List.empty(growable: true);
-    while(_start.x != _end.x) {
+    int currX = _start.x;
+    while(currX != _end.x) {
       Pos p;
-      if(_start.x < _end.x)
-        p = Pos(_start.x + 1, _start.y);
+      if(currX < _end.x)
+        p = Pos(currX++, _start.y);
       else
-        p = Pos(_start.x - 1, _start.y);
+        p = Pos(currX--, _start.y);
+      _path!.add(p);
     }
 
-    while(_start.y != _end.y) {
+    int currY = _start.y;
+    while(currY != _end.y) {
       Pos p;
-      if(_start.y < _end.y)
-        p = Pos(_start.x, _start.y + 1);
+      if(currY < _end.y)
+        p = Pos(_start.x, currY++);
       else
-        p = Pos(_start.x, _start.y - 1);
+        p = Pos(_start.x, currY--);
+      _path!.add(p);
     }
   }
 
@@ -135,9 +141,22 @@ class Player {
   String get session => _session;
   String? get map => _map;
   bool get status => _status;
+  Pos get start => _start;
 
   void set map(String? map) => _map = map;
+  void set end(Pos pos) {
+    var root = FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(_session)
+        .child("Maps")
+        .child(map!)
+        .child("Players")
+        .child(_name)
+        .child("EPos");
 
+    root.child("x").set(pos.x);
+    root.child("y").set(pos.y);
+  }
 }
 
 class Pos {

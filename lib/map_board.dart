@@ -32,6 +32,12 @@ class MapObj {
   MapObj(this.name, this.type, this.occupied);
 }
 
+class Data {
+  static String map = "";
+  static String? session;
+  static Player? player;
+}
+
 class _ImageLoaderState extends State<ImageLoader> {
   HashMap<String, ui.Image?> _images = HashMap();
   late List<List<MapObj>> objMap;
@@ -40,14 +46,18 @@ class _ImageLoaderState extends State<ImageLoader> {
   initState(){
     super.initState();
     _fetchBackgroundImages();
+    Data.map = widget.path;
+    Data.session = widget.session;
+    Data.player = widget.player;
+
     objMap = List.generate(widget.map.length, (i) =>
         List.generate(
             widget.map[i].length, (index) => MapObj(null, null, false)));
     if(widget.session != null) {
       _fetchObjectImages(true);
       _fetchObjectImages(false);
-      _buildObjectMap(true);
-      _buildObjectMap(false);
+      //_buildObjectMap(true);
+      //_buildObjectMap(false);
     }
   }
 
@@ -107,9 +117,8 @@ class _ImageLoaderState extends State<ImageLoader> {
    HashMap<dynamic, dynamic> map = HashMap.from(data.value);
    map.forEach((key, value) {
      MapObj map = MapObj("${key.toString()}.png", player ? Objects.Player : Objects.Object, true);
-     int x = value["Pos"]["x"];
-     int y = value["Pos"]["y"];
-     print("BUILD MAP: ${x} ${y}");
+     int x = value["${player ? "SPos" : "Pos"}"]["x"];
+     int y = value["${player ? "SPos" : "Pos"}"]["y"];
      setState(() {
        objMap[x][y] = map;
      });
@@ -139,6 +148,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   // The radius of the entire board in hexagons, not including the center.
   static const _boardRadius = 12;
 
+  List<Player>? players;
+  late AnimationController controller;
+  late Widget boardWidget;
+
   Board _board = Board(_boardRadius, _squareRadius, _squareMargin, null);
 
   double _scale = 1.0;
@@ -147,6 +160,36 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   final TransformationController _transformationController = TransformationController();
   Animation<Matrix4>? _animationReset;
   AnimationController? _controllerReset;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 5),
+    )..repeat();
+
+    if(Data.session != null) {
+      _loadPlayers();
+      boardWidget = buildAnimation();
+    }
+    else {
+      boardWidget = buildCustomPainter();
+    }
+
+    _controllerReset = AnimationController(
+      vsync: this,
+    );
+    _transformationController.addListener(_onTransformationChange);
+  }
+
+  void _loadPlayers() async {
+    List<Player> temp = await Player.loadPlayers(Data.session!, Data.map);
+    setState(() {
+      players = temp;
+    });
+  }
 
   // Handle reset to home transform animation.
   void _onAnimateReset() {
@@ -189,6 +232,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _onTapUp(TapUpDetails details) {
     final Offset scenePoint = _transformationController.toScene(details.localPosition);
     final BoardPoint? boardPoint = _board.pointToBoardPoint(scenePoint);
+    if(Data.player != null && boardPoint != null) {
+      Data.player!.end = Pos(boardPoint.row, boardPoint.col);
+    }
     setState(() {
       _board = _board.copyWithSelected(boardPoint!);
     });
@@ -205,18 +251,42 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _controllerReset = AnimationController(
-      vsync: this,
-    );
-    _transformationController.addListener(_onTransformationChange);
-  }
-
-  @override
   void didUpdateWidget(GamePage oldWidget) {
     super.didUpdateWidget(oldWidget);
   }
+
+  CustomPaint buildCustomPainter() {
+    return CustomPaint(
+      size: _board.size,
+      painter: _BoardPainter(
+          board: _board,
+          showDetail: _scale > 1.5,
+          scale: _scale,
+          images: widget._images,
+          map: widget._map,
+          objMap: widget._objMap,
+          players: players
+      ),
+      // This child gives the CustomPaint an intrinsic size.
+      child: SizedBox(
+        width: _board.size.width,
+        height: _board.size.height,
+      ),
+    );
+  }
+
+  Widget buildAnimation() {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) {
+        if(players != null)
+          players!.forEach((player) { player.move(); });
+        //_updateMapObj();
+        return buildCustomPainter();
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -269,22 +339,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                 ),
                 minScale: 0.01,
                 onInteractionStart: _onScaleStart,
-                child: CustomPaint(
-                  size: _board.size,
-                  painter: _BoardPainter(
-                      board: _board,
-                      showDetail: _scale > 1.5,
-                      scale: _scale,
-                      images: widget._images,
-                      map: widget._map,
-                      objMap: widget._objMap
-                  ),
-                  // This child gives the CustomPaint an intrinsic size.
-                  child: SizedBox(
-                    width: _board.size.width,
-                    height: _board.size.height,
-                  ),
-                ),
+                child: boardWidget
               ),
             );
           },
@@ -324,7 +379,8 @@ class _BoardPainter extends CustomPainter {
     required this.scale,
     required this.images,
     required this.map,
-    required this.objMap
+    required this.objMap,
+    required this.players
   });
 
   final bool showDetail;
@@ -332,6 +388,7 @@ class _BoardPainter extends CustomPainter {
   final HashMap<String, ui.Image?> images;
   final List<List<String>> map;
   final List<List<MapObj>> objMap;
+  final List<Player>? players;
   final double scale;
 
   @override
@@ -356,11 +413,21 @@ class _BoardPainter extends CustomPainter {
               image: bgImg,
               rect: Rect.fromPoints(positions[0], positions[5]));
 
-        MapObj m = objMap[boardPoint.row][boardPoint.col];
-        if(m.occupied) {
-          var objImg = images[m.name];
-          if(objImg != null)
-            paintImage(canvas: canvas, image: objImg, rect: Rect.fromPoints(positions[0], positions[5]));
+        if(Data.session != null) {
+          // MapObj m = objMap[boardPoint.row][boardPoint.col];
+          Pos curr = Pos(boardPoint.row, boardPoint.col);
+          String? name;
+          if(players != null) {
+            players!.forEach((element) {
+              if (curr == element.start)
+                name = element.name;
+            });
+            var objImg = images["${name}.png"];
+            if (objImg != null)
+              paintImage(canvas: canvas,
+                  image: objImg,
+                  rect: Rect.fromPoints(positions[0], positions[5]));
+          }
         }
 
         canvas.drawLine(positions[0], positions[1], Paint());
@@ -404,6 +471,6 @@ class _BoardPainter extends CustomPainter {
   // We should repaint whenever the board changes, such as board.selected.
   @override
   bool shouldRepaint(_BoardPainter oldDelegate) {
-    return oldDelegate.board != board;
+    return true;
   }
 }
