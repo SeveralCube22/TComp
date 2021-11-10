@@ -135,6 +135,7 @@ class GamePage extends StatefulWidget {
   late HashMap<String, ui.Image?> _images;
   late List<List<String>> _map;
   late List<List<MapObj>> _objMap;
+  List<Offset?> drawPoints = List.empty(growable: true);
 
   @override
   _GamePageState createState() => _GamePageState();
@@ -250,6 +251,32 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     }
   }
 
+  void _onPanStart(DragStartDetails details) {
+    final box = context.findRenderObject() as RenderBox;
+    final point = box.globalToLocal(details.globalPosition);
+    setState(() {
+      if(widget.drawPoints == null) {
+        widget.drawPoints = List.empty(growable: true);
+      }
+      widget.drawPoints.add(point);
+    });
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    final box = context.findRenderObject() as RenderBox;
+    final point = box.globalToLocal(details.globalPosition);
+    setState(() {
+      widget.drawPoints.add(point);
+    });
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    setState(() {
+      widget.drawPoints.add(null);
+      print(widget.drawPoints);
+    });
+  }
+
   @override
   void didUpdateWidget(GamePage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -265,7 +292,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           images: widget._images,
           map: widget._map,
           objMap: widget._objMap,
-          players: players
+          players: players,
+          drawnPoints: widget.drawPoints
       ),
       // This child gives the CustomPaint an intrinsic size.
       child: SizedBox(
@@ -323,8 +351,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             // GestureDetector. Removing the onTapUp fixes it.
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onDoubleTap: () {print('justin double');},
+              onDoubleTap: () {},
               onTapUp: _onTapUp,
+              onPanStart: _onPanStart,
+              onPanUpdate: _onPanUpdate,
+              onPanEnd: _onPanEnd,
               child: InteractiveViewer(
                 onInteractionUpdate: (ScaleUpdateDetails details) {
                   //print('justin onInteractionUpdate ${details.scale}');
@@ -380,7 +411,8 @@ class _BoardPainter extends CustomPainter {
     required this.images,
     required this.map,
     required this.objMap,
-    required this.players
+    required this.players,
+    required this.drawnPoints,
   });
 
   final bool showDetail;
@@ -390,6 +422,7 @@ class _BoardPainter extends CustomPainter {
   final List<List<MapObj>> objMap;
   final List<Player>? players;
   final double scale;
+  final List<Offset?>? drawnPoints;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -435,37 +468,21 @@ class _BoardPainter extends CustomPainter {
         canvas.drawLine(positions[4], positions[5], Paint());
         canvas.drawLine(positions[5], positions[1], Paint());
       }
-
-      //print((positions[1].dx - positions[0].dx).toString() + " " + (positions[2].dy - positions[0].dy).toString() + "\n");
-
-      /*
-      final ui.ParagraphBuilder paragraphBuilder = ui.ParagraphBuilder(ui.ParagraphStyle(
-        fontSize: 12.0,
-        height: 20.0,
-        maxLines: 1,
-        textAlign: TextAlign.start,
-        textDirection: TextDirection.ltr,
-      ));
-      /*
-      paragraphBuilder.pushStyle(ui.TextStyle(
-        color: Colors.red,
-        fontSize: 12.0,
-        height: 20.0,
-      ));
-      */
-      paragraphBuilder.addText('hello ${boardPoint.q}, ${boardPoint.r}');
-      final ui.Paragraph paragraph = paragraphBuilder.build();
-      final Point<double> textPoint = board.boardPointToPoint(boardPoint);
-      final Offset textOffset = Offset(
-        textPoint.x,
-        textPoint.y,
-      );
-      print('justin draw at $textOffset');
-      canvas.drawParagraph(paragraph, textOffset);
-      */
     }
 
     board.forEach(drawBoardPoint);
+    if(drawnPoints != null) {
+      Paint paint = Paint()
+        ..color = Colors.black
+        ..strokeWidth = 4.0
+        ..style = PaintingStyle.stroke
+        ..strokeJoin = StrokeJoin.round;
+      for(int i = 0; i < drawnPoints!.length - 1; i++) {
+        if (drawnPoints![i] != null && drawnPoints![i + 1] != null) {
+          canvas.drawLine(drawnPoints![i]!, drawnPoints![i +1]!, paint);
+        }
+      }
+    }
   }
 
   // We should repaint whenever the board changes, such as board.selected.
