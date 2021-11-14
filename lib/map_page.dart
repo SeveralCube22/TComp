@@ -27,6 +27,7 @@ class _MapPageState extends State<MapPage> {
   String _name;
   bool inSession = false;
   String? session = null;
+  String? sessionLink = null;
   List<PlayerState> players = [];
 
   List<String> _maps = [];
@@ -77,6 +78,7 @@ class _MapPageState extends State<MapPage> {
             setState(() {
               inSession = true;
               session = res.session;
+              sessionLink = res.sessionLink;
               res.players.forEach((element) {
                 players.add(PlayerState(element, null));
               });
@@ -110,7 +112,6 @@ class _MapPageState extends State<MapPage> {
                         shrinkWrap: true,
                         itemBuilder: (BuildContext context, int index) {
                           players[index].state = players[index].currMap == map;
-                          print("HERE ${players[index].state}");
                           return CheckboxListTile(
                               title: Text("${players[index].player.name} ${players[index].currMap == null ? "" : "(In ${players[index].currMap!.split("_")[2]})"}"),
                               value: players[index].state,
@@ -172,7 +173,7 @@ class _MapPageState extends State<MapPage> {
                                 builder: (contex) => ImageLoader(
                                     path: "${_uid}_${_name}_${_maps[index]}",
                                     player: null,
-                                    session: inSession ? session : null,
+                                    session: inSession ? sessionLink : null,
                                     map: map)));
                       });
                     },

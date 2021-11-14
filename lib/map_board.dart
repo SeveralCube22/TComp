@@ -274,8 +274,26 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _onPanEnd(DragEndDetails details) {
     setState(() {
       widget.drawPoints.add(null);
+      if(Data.session != null)
+        _saveDraw();
     });
   }
+
+  void _saveDraw() {
+    print("TEST: ${Data.session!}");
+    var root = FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(Data.session!)
+        .child("Maps")
+        .child(Data.map)
+        .child("Draw");
+
+    for(int i = 0; i < widget.drawPoints.length; i++) {
+      var point = widget.drawPoints[i];
+      root.child("${i}").set({"x" : "${point == null ? "" : point.dx}", "y" : "${point == null ? "" : point.dy}"});
+    }
+  }
+
 
   @override
   void didUpdateWidget(GamePage oldWidget) {

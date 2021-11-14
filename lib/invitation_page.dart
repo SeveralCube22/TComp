@@ -19,7 +19,7 @@ class Invitation extends StatefulWidget {
 
 class _InvitationState extends State<Invitation> {
   var sessionController = TextEditingController();
-  var currId = "";
+  String currId = "";
   String? currSession;
 
   List<Player> players = [];
@@ -32,16 +32,18 @@ class _InvitationState extends State<Invitation> {
         .child("Players")
         .once().then((data) {
       List<Player> temp = [];
-      data.value.forEach((key, value) {
-        String name = key;
-        var player = value;
-        bool status = player["Status"];
-        temp.add(Player(name, currId, status));
-      });
-      players = temp;
-      setState(() {
+      if(data.value != "") {
+        data.value.forEach((key, value) {
+          String name = key;
+          var player = value;
+          bool status = player["Status"];
+          temp.add(Player(name, currId, status));
+        });
+        players = temp;
+        setState(() {
 
-      });
+        });
+      }
     });
   }
 
@@ -159,6 +161,7 @@ class _InvitationState extends State<Invitation> {
                 else {
                   res.inSession = true;
                   res.session = currSession!;
+                  res.sessionLink = currId;
                   res.players = players;
                   FirebaseDatabase.instance.reference() // TODO session cache to detect when DM leaves session
                                   .child("Sessions")
@@ -179,5 +182,6 @@ class _InvitationState extends State<Invitation> {
 class Result {
   late bool inSession;
   late String session;
+  late String sessionLink;
   late List<Player> players;
 }
