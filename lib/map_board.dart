@@ -126,8 +126,6 @@ class _ImageLoaderState extends State<ImageLoader> {
   }
 }
 
-
-
 // ignore: must_be_immutable
 class GamePage extends StatefulWidget {
   GamePage(this._images, this._map, this._objMap, {Key? key}) : super(key: key);
@@ -135,6 +133,7 @@ class GamePage extends StatefulWidget {
   late HashMap<String, ui.Image?> _images;
   late List<List<String>> _map;
   late List<List<MapObj>> _objMap;
+
   List<Offset?> drawPoints = List.empty(growable: true);
 
   @override
@@ -157,6 +156,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   double _scale = 1.0;
   bool _firstRender = true;
+  bool _drawable = false;
   Matrix4? _homeTransformation;
   final TransformationController _transformationController = TransformationController();
   Animation<Matrix4>? _animationReset;
@@ -166,12 +166,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    controller = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 5),
-    )..repeat();
-
     if(Data.session != null) {
+      controller = AnimationController(
+        vsync: this,
+        duration: Duration(seconds: 5),
+      )..repeat();
       _loadPlayers();
       boardWidget = buildAnimation();
     }
@@ -252,10 +251,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _onPanStart(DragStartDetails details) {
-    final box = context.findRenderObject() as RenderBox;
-    final point = box.globalToLocal(details.globalPosition);
+    final point =_transformationController.toScene(
+      details.localPosition,
+    );
     setState(() {
-      if(widget.drawPoints == null) {
+      if (widget.drawPoints == null) {
         widget.drawPoints = List.empty(growable: true);
       }
       widget.drawPoints.add(point);
@@ -263,8 +263,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    final box = context.findRenderObject() as RenderBox;
-    final point = box.globalToLocal(details.globalPosition);
+    final point = _transformationController.toScene(
+      details.localPosition,
+    );
     setState(() {
       widget.drawPoints.add(point);
     });
@@ -273,7 +274,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _onPanEnd(DragEndDetails details) {
     setState(() {
       widget.drawPoints.add(null);
-      print(widget.drawPoints);
     });
   }
 
@@ -315,6 +315,17 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildDrawableIcon() {
+    return IconButton(
+      icon: _drawable ? Icon(Icons.palette_rounded) : Icon(Icons.palette_outlined),
+      onPressed: () {
+        setState(() {
+          _drawable = !_drawable;
+        });
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +335,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       backgroundColor: Theme.of(context).colorScheme.primary,
       appBar: AppBar(
         title: const Text('MyGameBoard'),
-        actions: <Widget>[resetButton],
+        actions: <Widget>[resetButton, _buildDrawableIcon()],
       ),
       body: Container(
         color: Colors.grey,
@@ -353,9 +364,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               behavior: HitTestBehavior.opaque,
               onDoubleTap: () {},
               onTapUp: _onTapUp,
-              onPanStart: _onPanStart,
-              onPanUpdate: _onPanUpdate,
-              onPanEnd: _onPanEnd,
+              onPanStart: _drawable ? _onPanStart : null,
+              onPanUpdate: _drawable ? _onPanUpdate : null,
+              onPanEnd: _drawable ? _onPanEnd : null,
               child: InteractiveViewer(
                 onInteractionUpdate: (ScaleUpdateDetails details) {
                   //print('justin onInteractionUpdate ${details.scale}');
@@ -370,6 +381,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                 ),
                 minScale: 0.01,
                 onInteractionStart: _onScaleStart,
+                  panEnabled: !_drawable,
+                  scaleEnabled: !_drawable,
                 child: boardWidget
               ),
             );
