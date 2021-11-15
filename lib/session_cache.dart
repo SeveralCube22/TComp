@@ -18,6 +18,7 @@ class SessionCache {
         root.child(sessionLink!).child("Players").child(displayName!).child("Status").set(false);
       }
       root.child(link).child("Players").child(displayName!).child("Status").set(true);
+      root.child(link).child("Players").child(displayName!).child("Map").set("");
       sessionLink = link;
       return true;
     }

@@ -25,6 +25,7 @@ class Player {
                     .child("Players")
                     .child(_name)
                     .child("Map")
+                    .child("Map")
                     .set(map);
     FirebaseDatabase.instance.reference()
         .child("Sessions")
@@ -42,6 +43,7 @@ class Player {
         .child(_session)
         .child("Players")
         .child(_name)
+        .child("Map")
         .child("Map")
         .set("");
     FirebaseDatabase.instance.reference()
@@ -69,27 +71,28 @@ class Player {
         .child(session);
 
     var status = await root.child("Players").get();
-    HashMap<String, int> playerNames = HashMap();
-    HashMap<dynamic, dynamic> statusVals = HashMap.from(status.value);
-    statusVals.forEach((key, value) {
-      if(value["Map"] == map && value["Status"])
-        playerNames.putIfAbsent(key, () => 0);
-    });
-
-    var m = await root.child("Maps").child(map).child("Players").get();
     List<Player> players = List.empty(growable: true);
-    HashMap<dynamic, dynamic> mPlayers = HashMap.from(m.value);
-    mPlayers.forEach((key, value) {
-      if(playerNames.containsKey(key)) {
-        Pos startPos = Pos(value["SPos"]["x"], value["SPos"]["y"]);
+    if(status.value != "") {
+      HashMap<String, int> playerNames = HashMap();
+      HashMap<dynamic, dynamic> statusVals = HashMap.from(status.value);
+      statusVals.forEach((key, value) {
+        if (value["Map"]["Map"] == map && value["Status"])
+          playerNames.putIfAbsent(key, () => 0);
+      });
 
-        Player player = Player(key, session, true);
-        player._map = map;
-        player._start = startPos;
-        player._end = startPos;
-        players.add(player);
-      }
-    });
+      var m = await root.child("Maps").child(map).child("Players").get();
+      HashMap<dynamic, dynamic> mPlayers = HashMap.from(m.value);
+      mPlayers.forEach((key, value) {
+        if (playerNames.containsKey(key)) {
+          Pos startPos = Pos(value["SPos"]["x"], value["SPos"]["y"]);
+          Player player = Player(key, session, true);
+          player._map = map;
+          player._start = startPos;
+          player._end = startPos;
+          players.add(player);
+        }
+      });
+    }
 
     return players;
   }

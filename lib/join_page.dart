@@ -90,7 +90,9 @@ class _JoinState extends State<Join> {
       stream: FirebaseDatabase.instance.reference()
           .child("Sessions")
           .child(SessionCache.sessionLink!)
-          .child("In Session")
+          .child("Players")
+          .child(SessionCache.displayName!)
+          .child("Map")
           .onChildChanged,
       builder: (BuildContext context, AsyncSnapshot<Event> snapshot) {
         return snapshot.data == null ? buildLoading() : buildMap();
@@ -102,7 +104,7 @@ class _JoinState extends State<Join> {
     return Center(child: Text("Wait for host..."));
   }
 
-  Future<List<List<String>>> loadMap() async {
+  Future<List<List<String>>?> loadMap() async {
     DataSnapshot data = await FirebaseDatabase.instance
         .reference()
         .child("Sessions")
@@ -110,19 +112,25 @@ class _JoinState extends State<Join> {
         .child("Players")
         .child(SessionCache.displayName!)
         .child("Map")
+        .child("Map")
         .get();
 
-      setState(() {
-        currentMap = data.value;
-        player.map = data.value;
-        player.storeAvatar(avatar!);
-      });
-      return Map.loadMap(currentMap!);
+      if(data.value != "") {
+        setState(() {
+          currentMap = data.value;
+          player.map = data.value;
+          player.storeAvatar(avatar!);
+        });
+        return Map.loadMap(currentMap!);
+      }
+      return null;
   }
 
  Future<Widget> refreshMap() async {
-    List<List<String>> map = await loadMap();
-    return ImageLoader(path: currentMap!, player: player, session: player.session, map: map);
+    List<List<String>>? map = await loadMap();
+    if(map != null)
+      return ImageLoader(path: currentMap!, player: player, session: player.session, map: map);
+    return buildLoading();
   }
 
   Widget buildMap() {

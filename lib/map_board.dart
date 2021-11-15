@@ -78,8 +78,10 @@ class _ImageLoaderState extends State<ImageLoader> {
           completer.complete(info);
         }));
         completer.future.then((imgInfo) {
-          print(refs[i].name);
-          _images[refs[i].name] = imgInfo.image;
+          print("BG: ${refs[i].name}");
+          setState(() {
+            _images[refs[i].name] = imgInfo.image;
+          });
         });
       });
     }
@@ -88,6 +90,7 @@ class _ImageLoaderState extends State<ImageLoader> {
   void _fetchObjectImages(bool player) async {
     ListResult res =  await FirebaseStorage.instance.ref().child("Sessions/${widget.session}/${player ? "Players" : "Objects"}/${widget.path}/").listAll();
     List<Reference> refs = res.items;
+    print("DEBUG OBJ HERE ${refs.length}");
     for (int i = 0; i < refs.length; i++) {
       Reference ref = refs[i];
       print("BUILD IMAGE ${ref.name}");
@@ -99,7 +102,9 @@ class _ImageLoaderState extends State<ImageLoader> {
               completer.complete(info);
             }));
         completer.future.then((imgInfo) {
-          _images[ref.name] = imgInfo.image;
+          setState(() {
+            _images[refs[i].name] = imgInfo.image;
+          });
         });
       });
     }
@@ -162,6 +167,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   Animation<Matrix4>? _animationReset;
   AnimationController? _controllerReset;
 
+  _GamePageState() {
+    if(Data.session != null) {
+      _loadDraw();
+      FirebaseDatabase.instance
+          .reference()
+          .child("Sessions")
+          .child(Data.session!)
+          .child("Maps")
+          .child(Data.map)
+          .onChildChanged
+          .listen((event) => _loadDraw());
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -190,6 +209,34 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       players = temp;
     });
   }
+
+  void _loadDraw() async {
+    var data = await FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(Data.session!)
+        .child("Maps")
+        .child(Data.map)
+        .get();
+
+    if(data.value["Draw"] != null) {
+      List<dynamic> values = data.value["Draw"];
+      List<Offset?> temp = List.empty(growable: true);
+      values.forEach((value) {
+        if (value["x"] != "") {
+          double x = double.parse(value["x"]);
+          double y = double.parse(value["y"]);
+          temp.add(Offset(x, y));
+        }
+        else
+          temp.add(null);
+      });
+      setState(() {
+        widget.drawPoints = temp;
+      });
+    }
+  }
+
+
 
   // Handle reset to home transform animation.
   void _onAnimateReset() {
@@ -236,7 +283,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       Data.player!.end = Pos(boardPoint.row, boardPoint.col);
     }
     setState(() {
-      _board = _board.copyWithSelected(boardPoint!);
+      if(boardPoint != null)
+        _board = _board.copyWithSelected(boardPoint!);
     });
   }
 
@@ -280,7 +328,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _saveDraw() {
-    print("TEST: ${Data.session!}");
     var root = FirebaseDatabase.instance.reference()
         .child("Sessions")
         .child(Data.session!)
@@ -334,14 +381,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   Widget _buildDrawableIcon() {
-    return IconButton(
+    return Data.player == null ? IconButton(
       icon: _drawable ? Icon(Icons.palette_rounded) : Icon(Icons.palette_outlined),
       onPressed: () {
         setState(() {
           _drawable = !_drawable;
         });
       },
-    );
+    ) : Container();
   }
 
 
@@ -382,9 +429,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               behavior: HitTestBehavior.opaque,
               onDoubleTap: () {},
               onTapUp: _onTapUp,
-              onPanStart: _drawable ? _onPanStart : null,
-              onPanUpdate: _drawable ? _onPanUpdate : null,
-              onPanEnd: _drawable ? _onPanEnd : null,
+              onPanStart: _drawable && Data.player == null ? _onPanStart : null,
+              onPanUpdate: _drawable && Data.player == null ? _onPanUpdate : null,
+              onPanEnd: _drawable && Data.player == null ? _onPanEnd : null,
               child: InteractiveViewer(
                 onInteractionUpdate: (ScaleUpdateDetails details) {
                   //print('justin onInteractionUpdate ${details.scale}');
@@ -427,6 +474,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _controllerReset!.dispose();
+    controller.dispose();
     _transformationController.removeListener(_onTransformationChange);
     super.dispose();
   }
