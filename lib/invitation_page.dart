@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_database/firebase_database.dart';
 import "package:flutter/material.dart";
 import 'package:nanoid/nanoid.dart';
@@ -21,6 +23,7 @@ class _InvitationState extends State<Invitation> {
   var sessionController = TextEditingController();
   String currId = "";
   String? currSession;
+  StreamSubscription<Event>? _event;
 
   List<Player> players = [];
 
@@ -69,7 +72,8 @@ class _InvitationState extends State<Invitation> {
                                     toastLength: Toast.LENGTH_LONG,
                                     gravity: ToastGravity.BOTTOM,
                                     timeInSecForIosWeb: 1);
-                              } else
+                              }
+                              else
                                 setState(() {
                                   widget.sessions.putIfAbsent(value, () => "");
                                   var id = nanoid(10);
@@ -85,6 +89,7 @@ class _InvitationState extends State<Invitation> {
                                   root.child("Sessions")
                                       .child(id)
                                       .set({"Players": "", "In Session":  {"In Session": false }});
+                                  _event = _buildPlayerListener();
                                 });
                             },
                             decoration: InputDecoration(hintText: "Session")))),
@@ -110,8 +115,7 @@ class _InvitationState extends State<Invitation> {
                             currSession = session;
                           });
 
-                          _refreshPlayers();
-                          FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
+                          _event = _buildPlayerListener();
                         }
                       },
                       items: widget.sessions.keys.map((String session) {
@@ -176,6 +180,13 @@ class _InvitationState extends State<Invitation> {
         ]),
       ),
     );
+  }
+
+  StreamSubscription<Event> _buildPlayerListener() {
+    if(_event != null)
+      _event!.cancel();
+    _refreshPlayers();
+    return FirebaseDatabase.instance.reference().child("Sessions").child(currId).child("Players").onChildChanged.listen((event) => _refreshPlayers());
   }
 }
 

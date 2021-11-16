@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:collection';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'board.dart';
 import 'player.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -156,6 +157,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   List<Player>? players;
   late AnimationController controller;
   late Widget boardWidget;
+  late XFile? currObj;
 
   Board _board = Board(_boardRadius, _squareRadius, _squareMargin, null);
 
@@ -176,6 +178,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           .child(Data.session!)
           .child("Maps")
           .child(Data.map)
+          .child("Draw")
           .onChildChanged
           .listen((event) => _loadDraw());
     }
@@ -218,8 +221,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         .child(Data.map)
         .get();
 
-    if(data.value["Draw"] != null) {
-      List<dynamic> values = data.value["Draw"];
+    if(data.value["Draw"]["Draw"] != null) {
+      List<dynamic> values = data.value["Draw"]["Draw"];
       List<Offset?> temp = List.empty(growable: true);
       values.forEach((value) {
         if (value["x"] != "") {
@@ -235,8 +238,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       });
     }
   }
-
-
 
   // Handle reset to home transform animation.
   void _onAnimateReset() {
@@ -333,7 +334,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         .child(Data.session!)
         .child("Maps")
         .child(Data.map)
-        .child("Draw");
+        .child("Draw")
+        .child("Draw"); //doing this because for some reason, listener doesn't work without it
 
     for(int i = 0; i < widget.drawPoints.length; i++) {
       var point = widget.drawPoints[i];
@@ -391,6 +393,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     ) : Container();
   }
 
+  Widget _buildMapEdit() {
+    return Data.player == null ? IconButton(
+      icon: Icon(Icons.add_outlined),
+      onPressed: () async {
+        ImagePicker picker = ImagePicker();
+        currObj = await picker.pickImage(source: ImageSource.gallery);
+      }
+    ) : Container();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -406,28 +418,31 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         color: Colors.grey,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Draw the scene as big as is available, but allow the user to
-            // translate beyond that to a visibleSize that's a bit bigger.
+
             final Size viewportSize = Size(
               constraints.maxWidth,
               constraints.maxHeight,
             );
 
-            // The board is drawn centered at the origin, which is the top left
-            // corner in InteractiveViewer, so shift it to the center of the
-            // viewport initially.
             if (_firstRender) {
               _firstRender = false;
               _homeTransformation = Matrix4.identity();
               _transformationController.value = _homeTransformation!;
             }
 
-            // TODO(justinmc): There is a bug where the scale gesture doesn't
-            // begin immediately, and it's caused by wrapping IV in a
-            // GestureDetector. Removing the onTapUp fixes it.
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onDoubleTap: () {},
+              onDoubleTapDown: (TapDownDetails details) {
+                if(currObj != null) {
+                  //get board pos
+                  final Offset scenePoint = _transformationController.toScene(details.localPosition);
+                  final BoardPoint? boardPoint = _board.pointToBoardPoint(scenePoint);
+                  //save image to objmap
+                  if(Data.player == null && boardPoint != null) {
+
+                  }
+                }
+              },
               onTapUp: _onTapUp,
               onPanStart: _drawable && Data.player == null ? _onPanStart : null,
               onPanUpdate: _drawable && Data.player == null ? _onPanUpdate : null,
@@ -480,8 +495,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 }
 
-// CustomPainter is what is passed to CustomPaint and actually draws the scene
-// when its `paint` method is called.
 class _BoardPainter extends CustomPainter {
   const _BoardPainter({
     required this.board,
@@ -506,11 +519,6 @@ class _BoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     void drawBoardPoint(BoardPoint? boardPoint) {
-      /*
-      final Color color = boardPoint.color.withOpacity(
-        board.selected == boardPoint ? 0.7 : 1,
-      );
-      */
       final double opacity = board.selected == boardPoint ? 0.2 : showDetail ? 0.8 : 0.5;
       Color color = Colors.white;
       if(boardPoint != null) {
@@ -564,7 +572,6 @@ class _BoardPainter extends CustomPainter {
     }
   }
 
-  // We should repaint whenever the board changes, such as board.selected.
   @override
   bool shouldRepaint(_BoardPainter oldDelegate) {
     return true;
