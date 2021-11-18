@@ -9,6 +9,7 @@ import 'board.dart';
 import 'player.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:nanoid/nanoid.dart';
 
 class ImageLoader extends StatefulWidget {
   const ImageLoader({Key? key, required this.path, required this.map, required this.session, required this.player}) : super(key: key);
@@ -52,7 +53,7 @@ class _ImageLoaderState extends State<ImageLoader> {
     Data.map = widget.path;
     Data.session = widget.session;
     Data.player = widget.player;
-
+    DrawPoints.drawnPoints = null;
     objMap = List.generate(widget.map.length, (i) =>
         List.generate(
             widget.map[i].length, (index) => MapObj(null, null, false)));
@@ -60,7 +61,7 @@ class _ImageLoaderState extends State<ImageLoader> {
       _fetchObjectImages(true);
       _fetchObjectImages(false);
       //_buildObjectMap(true);
-      //_buildObjectMap(false);
+      _buildObjectMap();
     }
   }
 
@@ -81,7 +82,6 @@ class _ImageLoaderState extends State<ImageLoader> {
           completer.complete(info);
         }));
         completer.future.then((imgInfo) {
-          print("BG: ${refs[i].name}");
           setState(() {
             _images[refs[i].name] = imgInfo.image;
           });
@@ -113,20 +113,20 @@ class _ImageLoaderState extends State<ImageLoader> {
     }
   }
 
-  void _buildObjectMap(bool player) async {
+  void _buildObjectMap() async {
    DataSnapshot data = await FirebaseDatabase.instance.reference()
         .child("Sessions")
         .child(widget.session!)
         .child("Maps")
         .child(widget.path)
-        .child("${player ? "Players" : "Objects"}")
+        .child("Objects")
         .get();
 
    HashMap<dynamic, dynamic> map = HashMap.from(data.value);
    map.forEach((key, value) {
-     MapObj map = MapObj("${key.toString()}.png", player ? Objects.Player : Objects.Object, true);
-     int x = value["${player ? "SPos" : "Pos"}"]["x"];
-     int y = value["${player ? "SPos" : "Pos"}"]["y"];
+     MapObj map = MapObj("${key.toString()}_obj.png", Objects.Object, true);
+     int x = value["Pos"]["x"];
+     int y = value["Pos"]["y"];
      setState(() {
        objMap[x][y] = map;
      });
@@ -173,6 +173,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   _GamePageState() {
     if(Data.session != null) {
       _loadDraw();
+      _buildObjectMap();
       FirebaseDatabase.instance
           .reference()
           .child("Sessions")
@@ -182,6 +183,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           .child("Draw")
           .onChildChanged
           .listen((event) => _loadDraw());
+      FirebaseDatabase.instance
+          .reference()
+          .child("Sessions")
+          .child(Data.session!)
+          .child("Maps")
+          .child(Data.map)
+          .child("Objects")
+
+          .onChildChanged
+          .listen((event) => _buildObjectMap());
     }
   }
 
@@ -214,6 +225,26 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
   }
 
+  void _buildObjectMap() async { // TODO NEED to abstract
+    DataSnapshot data = await FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(Data.session!)
+        .child("Maps")
+        .child(Data.map)
+        .child("Objects")
+        .get();
+
+    HashMap<dynamic, dynamic> map = HashMap.from(data.value);
+    map.forEach((key, value) {
+      MapObj map = MapObj("${key.toString()}_obj.png", Objects.Object, true);
+      int x = value["Pos"]["x"];
+      int y = value["Pos"]["y"];
+      setState(() {
+        widget._objMap[x][y] = map;
+      });
+    });
+  }
+
   void _loadDraw() async {
     var data = await FirebaseDatabase.instance.reference()
         .child("Sessions")
@@ -236,6 +267,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       });
       setState(() {
         widget.drawPoints = temp;
+        DrawPoints.drawnPoints = temp;
       });
     }
   }
@@ -292,7 +324,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           _saveBackground(boardPoint!);
         }
         else {
-
+          _saveObject(boardPoint!);
         }
       }
     }
@@ -317,6 +349,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         widget.drawPoints = List.empty(growable: true);
       }
       widget.drawPoints.add(point);
+      DrawPoints.drawnPoints = widget.drawPoints;
     });
   }
 
@@ -326,12 +359,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
     setState(() {
       widget.drawPoints.add(point);
+      DrawPoints.drawnPoints = widget.drawPoints;
     });
   }
 
   void _onPanEnd(DragEndDetails details) {
     setState(() {
       widget.drawPoints.add(null);
+      DrawPoints.drawnPoints = widget.drawPoints;
       if(Data.session != null)
         _saveDraw();
     });
@@ -369,7 +404,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           map: widget._map,
           objMap: widget._objMap,
           players: players,
-          drawnPoints: widget.drawPoints
       ),
       // This child gives the CustomPaint an intrinsic size.
       child: SizedBox(
@@ -413,6 +447,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _saveBackground(BoardPoint point) async {
+    print("SAVE BACKGROUND");
     File file = File(currObj!.path);
     var name = "${point.row}_${point.col}_bg.png"; // TODO change so that user gives asset name
     FirebaseStorage.instance
@@ -429,6 +464,37 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     widget._images.putIfAbsent(name, () => frame.image);
 
     widget._map[point.row][point.col] = name;
+  }
+
+  void _saveObject(BoardPoint point) async {
+    File file = File(currObj!.path);
+    var id = nanoid(5); // TODO change so that user can give obj a name and other attributes
+    var name = "${id}_obj.png";
+    FirebaseStorage.instance
+        .ref()
+        .child("Sessions/${Data.session!}/Objects/${Data.map}/${name}/")
+        .putFile(file);
+
+    FirebaseDatabase.instance.reference()
+        .child("Sessions")
+        .child(Data.session!)
+        .child("Maps")
+        .child(Data.map)
+        .child("Objects")
+        .child(id)
+        .child("Pos")
+        .set({"x": point.row, "y": point.col});
+
+    List<int> imageBase64 = file.readAsBytesSync();
+    String imageAsString = base64Encode(imageBase64);
+    var uint8list = base64.decode(imageAsString);
+
+    ui.Codec codec = await ui.instantiateImageCodec(uint8list);
+    ui.FrameInfo frame = await codec.getNextFrame();
+
+    widget._images.putIfAbsent(name, () => frame.image);
+    MapObj map = MapObj(name, Objects.Object, true);
+    widget._objMap[point.row][point.col] = map;
   }
 
 
@@ -522,7 +588,6 @@ class _BoardPainter extends CustomPainter {
     required this.map,
     required this.objMap,
     required this.players,
-    required this.drawnPoints,
   });
 
   final bool showDetail;
@@ -532,7 +597,6 @@ class _BoardPainter extends CustomPainter {
   final List<List<MapObj>> objMap;
   final List<Player>? players;
   final double scale;
-  final List<Offset?>? drawnPoints;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -566,6 +630,16 @@ class _BoardPainter extends CustomPainter {
                   image: objImg,
                   rect: Rect.fromPoints(positions[0], positions[5]));
           }
+
+          MapObj m = objMap[boardPoint.row][boardPoint.col];
+         if(m.name != null) {
+           var img = images[m.name];
+           if(img != null) {
+             paintImage(canvas: canvas,
+                 image: img,
+                 rect: Rect.fromPoints(positions[0], positions[5]));
+           }
+         }
         }
 
         canvas.drawLine(positions[0], positions[1], Paint());
@@ -576,15 +650,16 @@ class _BoardPainter extends CustomPainter {
     }
 
     board.forEach(drawBoardPoint);
-    if(drawnPoints != null) {
+    if(DrawPoints.drawnPoints != null) {
       Paint paint = Paint()
         ..color = Colors.black
         ..strokeWidth = 2.0
         ..style = PaintingStyle.stroke
         ..strokeJoin = StrokeJoin.round;
-      for(int i = 0; i < drawnPoints!.length - 1; i++) {
-        if (drawnPoints![i] != null && drawnPoints![i + 1] != null) {
-          canvas.drawLine(drawnPoints![i]!, drawnPoints![i +1]!, paint);
+
+      for(int i = 0; i < DrawPoints.drawnPoints!.length - 1; i++) {
+        if (DrawPoints.drawnPoints![i] != null && DrawPoints.drawnPoints![i + 1] != null) {
+          canvas.drawLine(DrawPoints.drawnPoints![i]!, DrawPoints.drawnPoints![i +1]!, paint);
         }
       }
     }
@@ -594,4 +669,8 @@ class _BoardPainter extends CustomPainter {
   bool shouldRepaint(_BoardPainter oldDelegate) {
     return true;
   }
+}
+
+class DrawPoints {
+  static List<Offset?>? drawnPoints;
 }

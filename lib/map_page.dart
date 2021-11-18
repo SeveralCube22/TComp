@@ -41,10 +41,11 @@ class _MapPageState extends State<MapPage> {
         .child("Maps")
         .once()
         .then((dataSnapshot) {
-      dataSnapshot.value.forEach((k, v) {
-        _maps.add(k.toString());
-      });
-
+          if(dataSnapshot.value != "") {
+            dataSnapshot.value.forEach((k, v) {
+              _maps.add(k.toString());
+            });
+          }
       setState(() {});
     });
 
