@@ -207,18 +207,6 @@ class _MapPageState extends State<MapPage> {
               mRoot.child("Maps").set("");
               Map.initMap(mRoot);
 
-              var status = await Permission.storage.status;
-              if (!status.isGranted) {
-                await Permission.storage.request();
-              }
-
-              File file = File('/storage/emulated/0/Download/cave.png');
-              //print(file.readAsString());
-              var name = "cave.png"; //TODO change
-              FirebaseStorage.instance
-                  .ref()
-                  .child("${_uid}_${_name}_${mName}/assets/${name}/")
-                  .putFile(file);
 
               setState(() {});
             }

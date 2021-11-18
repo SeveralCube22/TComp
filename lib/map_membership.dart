@@ -12,7 +12,7 @@ class Map {
       }
     });
     for (int i = 0; i < 12; i++) {
-      var row = List.generate(12, (index) => "cave.png");
+      var row = List.generate(12, (index) => "${i}_${index}_bg.png");
       mRoot.child("Map Data").child("Map").child("${i}").set(row);
     }
   }

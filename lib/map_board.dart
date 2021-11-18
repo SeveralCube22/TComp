@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'dart:collection';
 import 'package:firebase_database/firebase_database.dart';
@@ -7,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'board.dart';
 import 'player.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class ImageLoader extends StatefulWidget {
   const ImageLoader({Key? key, required this.path, required this.map, required this.session, required this.player}) : super(key: key);
@@ -132,7 +134,6 @@ class _ImageLoaderState extends State<ImageLoader> {
   }
 }
 
-// ignore: must_be_immutable
 class GamePage extends StatefulWidget {
   GamePage(this._images, this._map, this._objMap, {Key? key}) : super(key: key);
 
@@ -155,7 +156,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   static const _boardRadius = 12;
 
   List<Player>? players;
-  late AnimationController controller;
+  AnimationController? controller;
   late Widget boardWidget;
   late XFile? currObj;
 
@@ -278,15 +279,23 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _onTapUp(TapUpDetails details) {
-    final Offset scenePoint = _transformationController.toScene(details.localPosition);
+    final Offset scenePoint = _transformationController.toScene(
+        details.localPosition);
     final BoardPoint? boardPoint = _board.pointToBoardPoint(scenePoint);
-    if(Data.player != null && boardPoint != null) {
-      Data.player!.end = Pos(boardPoint.row, boardPoint.col);
+
+    if (boardPoint != null) {
+      if (Data.player != null) {
+        Data.player!.end = Pos(boardPoint.row, boardPoint.col);
+      }
+      else {
+        if(Data.session == null) {
+          _saveBackground(boardPoint!);
+        }
+        else {
+
+        }
+      }
     }
-    setState(() {
-      if(boardPoint != null)
-        _board = _board.copyWithSelected(boardPoint!);
-    });
   }
 
   void _onTransformationChange() {
@@ -372,7 +381,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   Widget buildAnimation() {
     return AnimatedBuilder(
-      animation: controller,
+      animation: controller!,
       builder: (_, __) {
         if(players != null)
           players!.forEach((player) { player.move(); });
@@ -403,6 +412,25 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     ) : Container();
   }
 
+  void _saveBackground(BoardPoint point) async {
+    File file = File(currObj!.path);
+    var name = "${point.row}_${point.col}_bg.png"; // TODO change so that user gives asset name
+    FirebaseStorage.instance
+        .ref()
+        .child("${Data.map}/assets/${name}/")
+        .putFile(file);
+
+    List<int> imageBase64 = file.readAsBytesSync();
+    String imageAsString = base64Encode(imageBase64);
+    var uint8list = base64.decode(imageAsString);
+
+    ui.Codec codec = await ui.instantiateImageCodec(uint8list);
+    ui.FrameInfo frame = await codec.getNextFrame();
+    widget._images.putIfAbsent(name, () => frame.image);
+
+    widget._map[point.row][point.col] = name;
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +440,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       backgroundColor: Theme.of(context).colorScheme.primary,
       appBar: AppBar(
         title: const Text('MyGameBoard'),
-        actions: <Widget>[resetButton, _buildDrawableIcon()],
+        actions: <Widget>[resetButton, _buildDrawableIcon(), _buildMapEdit()],
       ),
       body: Container(
         color: Colors.grey,
@@ -432,17 +460,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onDoubleTapDown: (TapDownDetails details) {
-                if(currObj != null) {
-                  //get board pos
-                  final Offset scenePoint = _transformationController.toScene(details.localPosition);
-                  final BoardPoint? boardPoint = _board.pointToBoardPoint(scenePoint);
-                  //save image to objmap
-                  if(Data.player == null && boardPoint != null) {
-
-                  }
-                }
-              },
               onTapUp: _onTapUp,
               onPanStart: _drawable && Data.player == null ? _onPanStart : null,
               onPanUpdate: _drawable && Data.player == null ? _onPanUpdate : null,
@@ -489,7 +506,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _controllerReset!.dispose();
-    controller.dispose();
+    if(controller != null)
+      controller!.dispose();
     _transformationController.removeListener(_onTransformationChange);
     super.dispose();
   }
@@ -558,18 +576,6 @@ class _BoardPainter extends CustomPainter {
     }
 
     board.forEach(drawBoardPoint);
-    if(drawnPoints != null) {
-      Paint paint = Paint()
-        ..color = Colors.black
-        ..strokeWidth = 4.0
-        ..style = PaintingStyle.stroke
-        ..strokeJoin = StrokeJoin.round;
-      for(int i = 0; i < drawnPoints!.length - 1; i++) {
-        if (drawnPoints![i] != null && drawnPoints![i + 1] != null) {
-          canvas.drawLine(drawnPoints![i]!, drawnPoints![i +1]!, paint);
-        }
-      }
-    }
   }
 
   @override
