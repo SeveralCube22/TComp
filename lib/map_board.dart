@@ -576,6 +576,18 @@ class _BoardPainter extends CustomPainter {
     }
 
     board.forEach(drawBoardPoint);
+    if(drawnPoints != null) {
+      Paint paint = Paint()
+        ..color = Colors.black
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke
+        ..strokeJoin = StrokeJoin.round;
+      for(int i = 0; i < drawnPoints!.length - 1; i++) {
+        if (drawnPoints![i] != null && drawnPoints![i + 1] != null) {
+          canvas.drawLine(drawnPoints![i]!, drawnPoints![i +1]!, paint);
+        }
+      }
+    }
   }
 
   @override
